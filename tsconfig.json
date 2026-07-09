@@ -15,6 +15,7 @@
 		"jsx": "react-jsx",
 		"paths": {
 			"@aylith/tickets-core": ["./packages/core/src/index.ts"],
+			"@aylith/tickets-core/client": ["./packages/core/src/client.ts"],
 			"@aylith/tickets-server": ["./packages/server/src/index.ts"],
 			"@aylith/tickets-ui": ["./packages/ui/src/index.ts"]
 		}
