@@ -1,7 +1,7 @@
 {
-	"name": "@aylith/tickets-server",
+	"name": "@aylith/tickets",
 	"version": "0.1.1",
-	"description": "Hono daemon and CLI for @aylith/tickets — REST API, SSE, terminal launch, AI enrich, media pipeline",
+	"description": "Everything-in-one package for @aylith/tickets — daemon + CLI, terminal UI, web components, and core types via subpath exports",
 	"license": "MIT",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -13,15 +13,28 @@
 			"bun": "./src/index.ts",
 			"import": "./dist/index.js"
 		},
-		"./cli": {
-			"bun": "./src/cli.ts",
-			"import": "./dist/cli.js"
+		"./client": {
+			"types": "./dist/client.d.ts",
+			"bun": "./src/client.ts",
+			"import": "./dist/client.js"
+		},
+		"./ui": {
+			"types": "./dist/ui.d.ts",
+			"bun": "./src/ui.ts",
+			"import": "./dist/ui.js"
+		},
+		"./server": {
+			"types": "./dist/server.d.ts",
+			"bun": "./src/server.ts",
+			"import": "./dist/server.js"
 		}
 	},
 	"bin": {
-		"tickets": "./dist/cli.js"
+		"tickets": "./bin/tickets.js",
+		"tickets-tui": "./bin/tickets-tui.js"
 	},
 	"files": [
+		"bin",
 		"dist"
 	],
 	"engines": {
@@ -30,7 +43,7 @@
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/aylith-labs/tickets.git",
-		"directory": "packages/server"
+		"directory": "packages/tickets"
 	},
 	"publishConfig": {
 		"access": "public"
@@ -41,9 +54,10 @@
 		"clean": "rm -rf dist"
 	},
 	"dependencies": {
-		"@anthropic-ai/sdk": "0.110.0",
 		"@aylith/tickets-core": "workspace:*",
-		"hono": "4.12.28"
+		"@aylith/tickets-server": "workspace:*",
+		"@aylith/tickets-tui": "workspace:*",
+		"@aylith/tickets-ui": "workspace:*"
 	},
 	"devDependencies": {
 		"tsup": "8.5.1",

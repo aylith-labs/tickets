@@ -11,7 +11,7 @@
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
 		"typecheck": "tsc --noEmit",
-		"build": "bun run --cwd packages/core build && bun run --cwd packages/ui build && bun run --cwd packages/server build && bun run --cwd packages/tui build",
+		"build": "bun run --cwd packages/core build && bun run --cwd packages/ui build && bun run --cwd packages/server build && bun run --cwd packages/tui build && bun run --cwd packages/tickets build",
 		"publish:all": "bash scripts/publish.sh",
 		"build:bin": "bun run build:web && bun build packages/server/src/binary.ts --compile --conditions=bun --outfile dist-bin/tickets && bun build packages/tui/src/index.tsx --compile --conditions=bun --outfile dist-bin/tickets-tui",
 		"build:web": "bun build apps/web/src/main.ts --outdir apps/web/dist --conditions=bun --minify && bun build packages/ui/src/index.ts --outfile apps/web/dist/components.js --conditions=bun --minify && cp apps/web/index.html apps/web/dist/index.html"

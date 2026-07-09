@@ -17,7 +17,11 @@
 			"@aylith/tickets-core": ["./packages/core/src/index.ts"],
 			"@aylith/tickets-core/client": ["./packages/core/src/client.ts"],
 			"@aylith/tickets-server": ["./packages/server/src/index.ts"],
-			"@aylith/tickets-ui": ["./packages/ui/src/index.ts"]
+			"@aylith/tickets-ui": ["./packages/ui/src/index.ts"],
+			"@aylith/tickets": ["./packages/tickets/src/index.ts"],
+			"@aylith/tickets/client": ["./packages/tickets/src/client.ts"],
+			"@aylith/tickets/ui": ["./packages/tickets/src/ui.ts"],
+			"@aylith/tickets/server": ["./packages/tickets/src/server.ts"]
 		}
 	},
 	"include": ["packages/*/src", "apps/*/src"],

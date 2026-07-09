@@ -10,8 +10,9 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 bun install --frozen-lockfile
 bun run build
 
-# core first — the others declare it as a dependency.
-for pkg in core ui server tui; do
+# Dependency order: core first, the umbrella (tickets) last — each package's
+# deps must already exist at the version it references.
+for pkg in core ui server tui tickets; do
 	version=$(cd "packages/$pkg" && node -p "require('./package.json').version")
 	name=$(cd "packages/$pkg" && node -p "require('./package.json').name")
 	echo "==> publishing $name@$version"

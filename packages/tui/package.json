@@ -1,9 +1,15 @@
 {
 	"name": "@aylith/tickets-tui",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Terminal UI for @aylith/tickets — browse and act on tickets across all projects",
 	"license": "MIT",
 	"type": "module",
+	"exports": {
+		".": {
+			"bun": "./src/index.tsx",
+			"import": "./dist/index.js"
+		}
+	},
 	"bin": {
 		"tickets-tui": "./dist/index.js"
 	},

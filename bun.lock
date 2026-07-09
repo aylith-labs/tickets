@@ -19,7 +19,7 @@
     },
     "packages/core": {
       "name": "@aylith/tickets-core",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "dependencies": {
         "gray-matter": "4.0.3",
       },
@@ -30,7 +30,7 @@
     },
     "packages/server": {
       "name": "@aylith/tickets-server",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "bin": {
         "tickets": "./dist/cli.js",
       },
@@ -44,9 +44,27 @@
         "typescript": "7.0.2",
       },
     },
+    "packages/tickets": {
+      "name": "@aylith/tickets",
+      "version": "0.1.1",
+      "bin": {
+        "tickets": "./bin/tickets.js",
+        "tickets-tui": "./bin/tickets-tui.js",
+      },
+      "dependencies": {
+        "@aylith/tickets-core": "workspace:*",
+        "@aylith/tickets-server": "workspace:*",
+        "@aylith/tickets-tui": "workspace:*",
+        "@aylith/tickets-ui": "workspace:*",
+      },
+      "devDependencies": {
+        "tsup": "8.5.1",
+        "typescript": "7.0.2",
+      },
+    },
     "packages/tui": {
       "name": "@aylith/tickets-tui",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "bin": {
         "tickets-tui": "./dist/index.js",
       },
@@ -68,7 +86,7 @@
     },
     "packages/ui": {
       "name": "@aylith/tickets-ui",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "dependencies": {
         "@aylith/tickets-core": "workspace:*",
         "lit": "3.3.3",
@@ -83,6 +101,8 @@
     "@alcalzone/ansi-tokenize": ["@alcalzone/ansi-tokenize@0.3.0", "", { "dependencies": { "ansi-styles": "^6.2.1", "is-fullwidth-code-point": "^5.0.0" } }, "sha512-p+CMKJ93HFmLkjXKlXiVGlMQEuRb6H0MokBSwUsX+S6BRX8eV5naFZpQJFfJHjRZY0Hmnqy1/r6UWl3x+19zYA=="],
 
     "@anthropic-ai/sdk": ["@anthropic-ai/sdk@0.110.0", "", { "dependencies": { "json-schema-to-ts": "^3.1.1", "standardwebhooks": "^1.0.0" }, "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["zod"], "bin": { "anthropic-ai-sdk": "bin/cli" } }, "sha512-hOP4bNYXDFHDxxiEgzlILXrxZIYCDnhe8sry0RDRKD/QnsEpvZcQpablCdm9X/WuD/YgOiSIkkqsL1mLLlTqJw=="],
+
+    "@aylith/tickets": ["@aylith/tickets@workspace:packages/tickets"],
 
     "@aylith/tickets-core": ["@aylith/tickets-core@workspace:packages/core"],
 

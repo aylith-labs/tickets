@@ -9,6 +9,7 @@ prompt, open a terminal (Windows Terminal, Tabby, …) already running
 
 | Package | What |
 |---|---|
+| [`@aylith/tickets`](https://www.npmjs.com/package/@aylith/tickets) | **Everything in one** — both CLIs (`tickets`, `tickets-tui`) plus the libraries below re-exported as subpaths (`.` = core, `/client`, `/ui`, `/server`) |
 | [`@aylith/tickets-core`](https://www.npmjs.com/package/@aylith/tickets-core) | Types, markdown ticket format, storage adapters (git data branch / plain folder), prompt composer |
 | [`@aylith/tickets-server`](https://www.npmjs.com/package/@aylith/tickets-server) | `tickets` CLI (`init`, `serve`, `tui`) — Hono daemon: REST API, SSE, terminal launch, AI enrich, media pipeline |
 | [`@aylith/tickets-ui`](https://www.npmjs.com/package/@aylith/tickets-ui) | Framework-agnostic Lit web components (`<ay-ticket-list>`, `<ay-ticket-card>`, …), themeable via CSS custom properties |
@@ -16,7 +17,8 @@ prompt, open a terminal (Windows Terminal, Tabby, …) already running
 | `apps/web` | Central UI served by the daemon — all projects at `/`, per-project at `/<project>` |
 
 ```bash
-npm i @aylith/tickets-ui   # embed the tracker in any app
+npm i @aylith/tickets      # everything — then import '@aylith/tickets/ui', '/client', '/server'
+npm i @aylith/tickets-ui   # lean: just the web components (no ink/react/hono)
 ```
 
 ## Development & publishing
@@ -31,7 +33,7 @@ bun run publish:all # build + bun publish each package (needs npm auth)
 ```
 
 CI (`.github/workflows/`): `ci.yml` runs tests/typecheck/lint/build on every
-push and PR; `publish.yml` publishes the three packages to npm on a published
+push and PR; `publish.yml` publishes the packages to npm on a published
 GitHub release (auth via the `NPM_TOKEN` repo secret).
 
 ## How data is stored
@@ -54,13 +56,13 @@ curl -fsSL https://raw.githubusercontent.com/aylith-labs/tickets/main/install.sh
 
 ```bash
 mise use -g "ubi:aylith-labs/tickets[exe=tickets]"   # release binary
-mise use -g npm:@aylith/tickets-server               # npm (needs Bun)
+mise use -g npm:@aylith/tickets                      # npm (needs Bun)
 ```
 
 **npm** (needs Bun to run — the daemon uses Bun APIs):
 
 ```bash
-npm i -g @aylith/tickets-server @aylith/tickets-tui
+npm i -g @aylith/tickets   # both CLIs: tickets + tickets-tui
 ```
 
 **From source:**
