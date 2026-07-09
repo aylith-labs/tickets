@@ -24,7 +24,7 @@ export class AyTicketCard extends LitElement {
 				display: flex;
 				align-items: center;
 				gap: 0.75rem;
-				padding: 0.65rem 0.85rem;
+				padding: 0.75rem 1rem;
 				background: var(--_surface);
 				border: 1px solid var(--_border);
 				border-radius: var(--_radius);
@@ -33,6 +33,36 @@ export class AyTicketCard extends LitElement {
 
 			.card:hover {
 				border-color: color-mix(in srgb, var(--_accent) 45%, var(--_border));
+			}
+
+			.card.board {
+				flex-direction: column;
+				align-items: stretch;
+				gap: 0.45rem;
+				padding: 0.65rem 0.75rem;
+				cursor: grab;
+			}
+
+			.card.board:active {
+				cursor: grabbing;
+			}
+
+			.board-top {
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+				min-height: 1.75rem;
+			}
+
+			.spacer {
+				flex: 1;
+			}
+
+			.board-title {
+				font-size: 0.8125rem;
+				font-weight: 500;
+				line-height: 1.45;
+				overflow-wrap: anywhere;
 			}
 
 			.id {
@@ -77,8 +107,19 @@ export class AyTicketCard extends LitElement {
 	@property({ attribute: false }) meta?: TicketsMeta;
 	/** Hide the project badge on single-project embeds. */
 	@property({ type: Boolean }) hideProject = false;
+	/** Vertical kanban-column layout; the card becomes a drag source. */
+	@property({ type: Boolean }) board = false;
 
 	@state() private undo?: UndoState;
+
+	private onDragStart(event: DragEvent): void {
+		if (!event.dataTransfer) return;
+		event.dataTransfer.setData(
+			'application/x-ay-ticket',
+			JSON.stringify({ project: this.ticket.project, id: this.ticket.id }),
+		);
+		event.dataTransfer.effectAllowed = 'move';
+	}
 
 	private notify(message: string): void {
 		this.dispatchEvent(new CustomEvent('ay-notify', { detail: { message }, bubbles: true, composed: true }));
@@ -193,11 +234,29 @@ export class AyTicketCard extends LitElement {
 
 	render() {
 		const { ticket } = this;
+		const open = () =>
+			this.dispatchEvent(new CustomEvent('ay-open', { detail: ticket, bubbles: true, composed: true }));
+		if (this.board) {
+			return html`
+				<div
+					class="card board ${ticket.archived ? 'archived' : ''}"
+					draggable="true"
+					@dragstart=${this.onDragStart}
+					@click=${open}
+				>
+					<div class="board-top">
+						<span class="id">#${ticket.id}</span>
+						${this.hideProject ? null : html`<span class="project">${ticket.project}</span>`}
+						<span class="spacer"></span>
+						<ay-kebab-menu .items=${this.kebabItems()} @ay-menu-open=${() => void this.loadUndoState()}></ay-kebab-menu>
+					</div>
+					<span class="board-title">${ticket.title}</span>
+					${ticket.attachments.length > 0 ? html`<span class="media-count">${ticket.attachments.length} media</span>` : null}
+				</div>
+			`;
+		}
 		return html`
-			<div
-				class="card ${ticket.archived ? 'archived' : ''}"
-				@click=${() => this.dispatchEvent(new CustomEvent('ay-open', { detail: ticket, bubbles: true, composed: true }))}
-			>
+			<div class="card ${ticket.archived ? 'archived' : ''}" @click=${open}>
 				<span class="id">#${ticket.id}</span>
 				<span class="title">${ticket.title}</span>
 				${ticket.attachments.length > 0 ? html`<span class="media-count">${ticket.attachments.length} media</span>` : null}

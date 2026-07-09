@@ -83,6 +83,38 @@ export const tokens = css`
 		cursor: pointer;
 	}
 
+	input[type='checkbox'].switch {
+		appearance: none;
+		width: 2.1rem;
+		height: 1.2rem;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--_text-muted) 38%, var(--_surface));
+		position: relative;
+		transition: background 0.15s ease;
+		flex-shrink: 0;
+	}
+
+	input[type='checkbox'].switch::before {
+		content: '';
+		position: absolute;
+		top: 2px;
+		left: 2px;
+		width: calc(1.2rem - 4px);
+		height: calc(1.2rem - 4px);
+		border-radius: 999px;
+		background: #ffffff;
+		box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+		transition: translate 0.15s ease;
+	}
+
+	input[type='checkbox'].switch:checked {
+		background: var(--_accent);
+	}
+
+	input[type='checkbox'].switch:checked::before {
+		translate: 0.9rem 0;
+	}
+
 	input:focus-visible,
 	textarea:focus-visible,
 	select:focus-visible,
