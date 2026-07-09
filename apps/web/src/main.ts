@@ -56,6 +56,11 @@ const main = (): void => {
 	list.setAttribute('api-base', API_BASE);
 	if (project) list.setAttribute('project', project);
 	document.querySelector('#app')?.append(list);
+	// The docked split wants the whole viewport — drop the shell's width cap while active.
+	document.addEventListener('ay-dock-change', (event) => {
+		const split = Boolean((event as CustomEvent<{ split?: boolean }>).detail?.split);
+		document.querySelector('.shell')?.classList.toggle('wide', split);
+	});
 };
 
 main();

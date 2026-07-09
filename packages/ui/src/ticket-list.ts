@@ -95,6 +95,16 @@ export class AyTicketList extends LitElement {
 				white-space: nowrap;
 			}
 
+			.badge {
+				font-size: 0.6875rem;
+				font-variant-numeric: tabular-nums;
+				background: var(--_surface-raised);
+				border: 1px solid var(--_border);
+				border-radius: 999px;
+				padding: 0 0.4rem;
+				line-height: 1.5;
+			}
+
 			.count {
 				font-variant-numeric: tabular-nums;
 			}
@@ -261,9 +271,31 @@ export class AyTicketList extends LitElement {
 		clearTimeout(this.toastTimer);
 	}
 
+	/** Everything (archived included) comes down in one request; visibility filters client-side. */
+	private get visibleTickets(): TicketWithProject[] {
+		return this.showArchived ? this.tickets : this.tickets.filter((ticket) => !ticket.archived);
+	}
+
+	private get archivedCount(): number {
+		return this.tickets.reduce((count, ticket) => count + (ticket.archived ? 1 : 0), 0);
+	}
+
+	/** Tell the host page when the split layout engages, so it can widen its container. */
+	updated(changed: Map<string, unknown>): void {
+		if (changed.has('docked') || changed.has('selected')) {
+			this.dispatchEvent(
+				new CustomEvent('ay-dock-change', {
+					detail: { docked: this.docked, split: this.docked && this.selected !== undefined },
+					bubbles: true,
+					composed: true,
+				}),
+			);
+		}
+	}
+
 	private async refresh(): Promise<void> {
 		try {
-			const tickets = await this.client.list({ project: this.project || undefined, archived: this.showArchived });
+			const tickets = await this.client.list({ project: this.project || undefined, archived: true });
 			this.tickets = tickets;
 			this.loadError = '';
 			if (!this.autoOpenChecked) {
@@ -354,11 +386,12 @@ export class AyTicketList extends LitElement {
 	}
 
 	private renderBoard() {
-		const statuses = this.meta?.statuses ?? [...new Set(this.tickets.map((ticket) => ticket.status))];
+		const tickets = this.visibleTickets;
+		const statuses = this.meta?.statuses ?? [...new Set(tickets.map((ticket) => ticket.status))];
 		return html`
 			<div class="board">
 				${statuses.map((status) => {
-					const columnTickets = this.tickets.filter((ticket) => ticket.status === status);
+					const columnTickets = tickets.filter((ticket) => ticket.status === status);
 					return html`
 						<div
 							class="column ${this.dragStatus === status ? 'drag-over' : ''}"
@@ -405,7 +438,7 @@ export class AyTicketList extends LitElement {
 				<div class="panes">
 				<div class="list-section">
 					<div class="toolbar">
-						<span class="count">${this.tickets.length} ticket${this.tickets.length === 1 ? '' : 's'}</span>
+						<span class="count">${this.visibleTickets.length} ticket${this.visibleTickets.length === 1 ? '' : 's'}</span>
 						<div class="controls">
 							<div class="view-toggle" role="group" aria-label="View">
 								<button class=${this.view === 'list' ? 'active' : ''} @click=${() => this.setView('list')}>
@@ -415,18 +448,22 @@ export class AyTicketList extends LitElement {
 									Board
 								</button>
 							</div>
-							<label>
-								Show archived
-								<input
-									type="checkbox"
-									class="switch"
-									.checked=${this.showArchived}
-									@change=${(event: Event) => {
-										this.showArchived = (event.currentTarget as HTMLInputElement).checked;
-										void this.refresh();
-									}}
-								/>
-							</label>
+							${
+								this.archivedCount > 0
+									? html`<label>
+										Show archived
+										<span class="badge">${this.archivedCount}</span>
+										<input
+											type="checkbox"
+											class="switch"
+											.checked=${this.showArchived}
+											@change=${(event: Event) => {
+												this.showArchived = (event.currentTarget as HTMLInputElement).checked;
+											}}
+										/>
+									</label>`
+									: null
+							}
 							<button
 								class="btn ${this.formOpen ? '' : 'btn-primary'}"
 								aria-expanded=${this.formOpen}
@@ -449,18 +486,22 @@ export class AyTicketList extends LitElement {
 
 					${this.loadError ? html`<div class="empty">${this.loadError}</div>` : null}
 					${
-						!this.loadError && this.tickets.length === 0
+						!this.loadError && this.visibleTickets.length === 0
 							? html`<div class="empty">
-								No tickets yet —
-								${this.formOpen ? 'capture the first one above.' : 'hit “New ticket” to capture the first one.'}
+								${
+									this.archivedCount > 0
+										? html`Nothing active — flip “Show archived” to see ${this.archivedCount} archived.`
+										: html`No tickets yet —
+										${this.formOpen ? 'capture the first one above.' : 'hit “New ticket” to capture the first one.'}`
+								}
 							</div>`
 							: null
 					}
 					${
-						this.tickets.length > 0
+						this.visibleTickets.length > 0
 							? this.view === 'board'
 								? this.renderBoard()
-								: html`<div class="cards">${this.tickets.map((ticket) => this.renderCard(ticket, false))}</div>`
+								: html`<div class="cards">${this.visibleTickets.map((ticket) => this.renderCard(ticket, false))}</div>`
 							: null
 					}
 				</div>
