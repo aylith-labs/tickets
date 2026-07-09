@@ -58,6 +58,11 @@ export class AyTicketForm extends LitElement {
 		this.meta = await this.client.meta();
 	}
 
+	/** The form is mounted on demand (toggled open) — always land focus in the title. */
+	firstUpdated(): void {
+		this.renderRoot.querySelector<HTMLInputElement>('input[name="title"]')?.focus();
+	}
+
 	private async submit(event: SubmitEvent): Promise<void> {
 		event.preventDefault();
 		const form = event.currentTarget as HTMLFormElement;

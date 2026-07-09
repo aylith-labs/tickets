@@ -28,6 +28,10 @@ export class AyTicketList extends LitElement {
 				gap: 0.7rem;
 			}
 
+			.form-slot {
+				margin: 0.3rem 0 0.65rem;
+			}
+
 			.toolbar {
 				display: flex;
 				align-items: center;
@@ -172,9 +176,12 @@ export class AyTicketList extends LitElement {
 	@state() private loadError = '';
 	@state() private view: 'list' | 'board' = 'list';
 	@state() private dragStatus = '';
+	@state() private formOpen = false;
 
 	private unsubscribe?: () => void;
 	private toastTimer?: ReturnType<typeof setTimeout>;
+	/** Auto-open the form only on the initial load (when there are no tickets yet). */
+	private autoOpenChecked = false;
 
 	connectedCallback(): void {
 		super.connectedCallback();
@@ -203,6 +210,10 @@ export class AyTicketList extends LitElement {
 			const tickets = await this.client.list({ project: this.project || undefined, archived: this.showArchived });
 			this.tickets = tickets;
 			this.loadError = '';
+			if (!this.autoOpenChecked) {
+				this.autoOpenChecked = true;
+				if (tickets.length === 0) this.formOpen = true;
+			}
 			if (this.selected) {
 				this.selected = tickets.find(
 					(ticket) => ticket.project === this.selected?.project && ticket.id === this.selected?.id,
@@ -287,7 +298,10 @@ export class AyTicketList extends LitElement {
 	render() {
 		return html`
 			<div
-				@ay-created=${() => this.refresh()}
+				@ay-created=${() => {
+					this.formOpen = false;
+					void this.refresh();
+				}}
 				@ay-changed=${() => this.refresh()}
 				@ay-notify=${(event: CustomEvent<{ message: string }>) => this.showToast(event.detail.message)}
 				@ay-open=${(event: CustomEvent<TicketWithProject>) => {
@@ -297,8 +311,6 @@ export class AyTicketList extends LitElement {
 					this.selected = undefined;
 				}}
 			>
-				<ay-ticket-form .client=${this.client} project=${this.project}></ay-ticket-form>
-
 				<div class="list-section">
 					<div class="toolbar">
 						<span class="count">${this.tickets.length} ticket${this.tickets.length === 1 ? '' : 's'}</span>
@@ -323,13 +335,33 @@ export class AyTicketList extends LitElement {
 									}}
 								/>
 							</label>
+							<button
+								class="btn ${this.formOpen ? '' : 'btn-primary'}"
+								aria-expanded=${this.formOpen}
+								@click=${() => {
+									this.formOpen = !this.formOpen;
+								}}
+							>
+								${this.formOpen ? 'Close' : 'New ticket'}
+							</button>
 						</div>
 					</div>
+
+					${
+						this.formOpen
+							? html`<div class="form-slot">
+								<ay-ticket-form .client=${this.client} project=${this.project}></ay-ticket-form>
+							</div>`
+							: null
+					}
 
 					${this.loadError ? html`<div class="empty">${this.loadError}</div>` : null}
 					${
 						!this.loadError && this.tickets.length === 0
-							? html`<div class="empty">No tickets yet — capture the first one above.</div>`
+							? html`<div class="empty">
+								No tickets yet —
+								${this.formOpen ? 'capture the first one above.' : 'hit “New ticket” to capture the first one.'}
+							</div>`
 							: null
 					}
 					${
