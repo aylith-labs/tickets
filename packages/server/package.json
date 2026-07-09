@@ -1,16 +1,48 @@
 {
 	"name": "@aylith/tickets-server",
 	"version": "0.1.0",
+	"description": "Hono daemon and CLI for @aylith/tickets — REST API, SSE, terminal launch, AI enrich, media pipeline",
+	"license": "MIT",
 	"type": "module",
-	"bin": {
-		"tickets": "./src/cli.ts"
-	},
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
 	"exports": {
-		".": "./src/index.ts"
+		".": {
+			"types": "./dist/index.d.ts",
+			"bun": "./src/index.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"bin": {
+		"tickets": "./dist/cli.js"
+	},
+	"files": [
+		"dist"
+	],
+	"engines": {
+		"bun": ">=1.2.0"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/aylith-labs/tickets.git",
+		"directory": "packages/server"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"build": "tsup && tsc -p tsconfig.json",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist"
 	},
 	"dependencies": {
 		"@anthropic-ai/sdk": "0.110.0",
 		"@aylith/tickets-core": "workspace:*",
 		"hono": "4.12.28"
+	},
+	"devDependencies": {
+		"tsup": "8.5.1",
+		"typescript": "7.0.2"
 	}
 }

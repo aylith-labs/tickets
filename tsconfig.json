@@ -11,7 +11,12 @@
 		"skipLibCheck": true,
 		"verbatimModuleSyntax": true,
 		"experimentalDecorators": true,
-		"useDefineForClassFields": false
+		"useDefineForClassFields": false,
+		"paths": {
+			"@aylith/tickets-core": ["./packages/core/src/index.ts"],
+			"@aylith/tickets-server": ["./packages/server/src/index.ts"],
+			"@aylith/tickets-ui": ["./packages/ui/src/index.ts"]
+		}
 	},
 	"include": ["packages/*/src", "apps/*/src"]
 }

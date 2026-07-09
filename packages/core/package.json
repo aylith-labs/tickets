@@ -1,11 +1,42 @@
 {
 	"name": "@aylith/tickets-core",
 	"version": "0.1.0",
+	"description": "Ticket types, markdown ticket format, storage adapters, and prompt composer for @aylith/tickets",
+	"license": "MIT",
 	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
 	"exports": {
-		".": "./src/index.ts"
+		".": {
+			"types": "./dist/index.d.ts",
+			"bun": "./src/index.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"sideEffects": false,
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/aylith-labs/tickets.git",
+		"directory": "packages/core"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"build": "tsup && tsc -p tsconfig.json",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist"
 	},
 	"dependencies": {
 		"gray-matter": "4.0.3"
+	},
+	"devDependencies": {
+		"tsup": "8.5.1",
+		"typescript": "7.0.2"
 	}
 }

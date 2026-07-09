@@ -1,6 +1,6 @@
 .PHONY: serve serve-bg stop build test check
 
-build: ## Build the web UI + embeddable components bundle
+build: ## Build the web UI + embeddable components bundle (daemon runs from src via the bun export condition)
 	bun run build:web
 
 serve: build ## Run the daemon in the foreground
