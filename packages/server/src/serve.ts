@@ -17,18 +17,24 @@ const CONTENT_TYPES: Record<string, string> = {
 	'.svg': 'image/svg+xml',
 };
 
-/** Central UI: single-segment assets from apps/web/dist, index.html for everything else. */
-const registerStaticUi = (app: Hono): void => {
+/** Asset name → file path. The compiled binary passes embedded paths; otherwise on-disk. */
+export type WebAssets = Record<string, string>;
+
+/**
+ * Central UI: single-segment assets, index.html for everything else. Assets
+ * resolve from the embedded map (standalone binary) or the on-disk build dir.
+ */
+const registerStaticUi = (app: Hono, webAssets?: WebAssets): void => {
+	const resolveAsset = (assetName: string): string => webAssets?.[assetName] ?? join(WEB_DIST_DIR, assetName);
 	app.get('*', async (c) => {
 		const pathname = new URL(c.req.url).pathname;
 		// basename() collapses any traversal attempt to a plain filename.
-		const assetName = basename(pathname);
-		const candidate = assetName.includes('.') ? join(WEB_DIST_DIR, assetName) : join(WEB_DIST_DIR, 'index.html');
-		const file = Bun.file(candidate);
+		const name = basename(pathname).includes('.') ? basename(pathname) : 'index.html';
+		const file = Bun.file(resolveAsset(name));
 		if (!(await file.exists())) {
 			return c.text('tickets daemon is running; the web UI is not built (run: bun run build:web)', 404);
 		}
-		const extension = candidate.slice(candidate.lastIndexOf('.'));
+		const extension = name.slice(name.lastIndexOf('.'));
 		return new Response(file, { headers: { 'content-type': CONTENT_TYPES[extension] ?? 'application/octet-stream' } });
 	});
 };
@@ -55,13 +61,13 @@ const watchProjects = (context: ServerContext): void => {
 	}
 };
 
-export const startDaemon = async (options: { configPath?: string; port?: number } = {}) => {
+export const startDaemon = async (options: { configPath?: string; port?: number; webAssets?: WebAssets } = {}) => {
 	const config = await readDaemonConfig(options.configPath);
 	if (options.port) config.port = options.port;
 	const context = createContext(config);
 	watchProjects(context);
 	const app = createApp(context);
-	registerStaticUi(app);
+	registerStaticUi(app, options.webAssets);
 	const server = Bun.serve({ port: config.port, fetch: app.fetch, idleTimeout: 0 });
 	console.log(`tickets daemon listening on http://localhost:${config.port} (${config.projects.length} project(s))`);
 	return server;

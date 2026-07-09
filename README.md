@@ -42,12 +42,41 @@ repo, checked out as a worktree at `<repo>.worktrees/tickets`. Every mutation is
 one commit — title/description history and undo come from git, not a bespoke
 store. A plain-folder adapter (no git) is available per project.
 
+## Install
+
+**Standalone binaries** (no runtime needed) — `tickets` (daemon + CLI) and `tickets-tui`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aylith-labs/tickets/main/install.sh | bash
+```
+
+**mise:**
+
+```bash
+mise use -g "ubi:aylith-labs/tickets[exe=tickets]"   # release binary
+mise use -g npm:@aylith/tickets-server               # npm (needs Bun)
+```
+
+**npm** (needs Bun to run — the daemon uses Bun APIs):
+
+```bash
+npm i -g @aylith/tickets-server @aylith/tickets-tui
+```
+
+**From source:**
+
+```bash
+git clone https://github.com/aylith-labs/tickets && cd tickets && bun install
+bun run build:bin     # → dist-bin/tickets, dist-bin/tickets-tui
+```
+
 ## Quick start
 
 ```bash
 cd ~/projects/some-repo
 tickets init          # creates the orphan branch + worktree, registers the project
-tickets serve         # starts the daemon (all registered projects)
+tickets serve         # starts the daemon (all registered projects) + web UI
+tickets tui           # browse and act on tickets across all projects
 ```
 
 ## Agent handoff

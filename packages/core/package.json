@@ -13,6 +13,12 @@
 			"bun": "./src/index.ts",
 			"import": "./dist/index.js",
 			"require": "./dist/index.cjs"
+		},
+		"./client": {
+			"types": "./dist/client.d.ts",
+			"bun": "./src/client.ts",
+			"import": "./dist/client.js",
+			"require": "./dist/client.cjs"
 		}
 	},
 	"files": [
