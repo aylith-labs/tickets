@@ -1,6 +1,6 @@
 {
 	"name": "@aylith/tickets",
-	"version": "0.1.2",
+	"version": "0.1.3",
 	"description": "Everything-in-one package for @aylith/tickets — daemon + CLI, terminal UI, web components, and core types via subpath exports",
 	"license": "MIT",
 	"type": "module",

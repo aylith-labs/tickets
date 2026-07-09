@@ -1,6 +1,6 @@
 {
 	"name": "@aylith/tickets-tui",
-	"version": "0.1.2",
+	"version": "0.1.3",
 	"description": "Terminal UI for @aylith/tickets — browse and act on tickets across all projects",
 	"license": "MIT",
 	"type": "module",

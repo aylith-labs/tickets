@@ -1,6 +1,6 @@
 {
 	"name": "@aylith/tickets-core",
-	"version": "0.1.2",
+	"version": "0.1.3",
 	"description": "Ticket types, markdown ticket format, storage adapters, and prompt composer for @aylith/tickets",
 	"license": "MIT",
 	"type": "module",
