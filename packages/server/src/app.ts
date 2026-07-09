@@ -4,6 +4,7 @@ import { cors } from 'hono/cors';
 import { streamSSE } from 'hono/streaming';
 import type { ServerContext } from './context';
 import { runStatusChangeHook } from './hooks';
+import { buildLaunchCommand } from './launch';
 import type { ProjectEntry } from './types/ProjectEntry';
 
 const isAllowedOrigin = (origin: string): boolean => {
@@ -134,6 +135,34 @@ export const createApp = (context: ServerContext): Hono => {
 			{ apiBase: context.config.apiBase, template: context.config.promptTemplate },
 		);
 		return c.text(prompt, 200, { 'content-type': 'text/plain; charset=utf-8' });
+	});
+
+	app.post('/api/tickets/:project/:id/launch', async (c) => {
+		const resolved = resolveProject(c.req.param('project'));
+		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
+		const id = c.req.param('id');
+		const ticket = await resolved.adapter.get(id);
+		if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
+
+		const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>);
+		const terminalId = typeof body.terminal === 'string' ? body.terminal : context.config.terminals[0]?.id;
+		const terminal = context.config.terminals.find((entry) => entry.id === terminalId);
+		if (!terminal) return c.json({ error: `Unknown terminal ${terminalId}` }, 400);
+
+		const apiBase = context.config.apiBase.replace(/\/$/, '');
+		const command = buildLaunchCommand(terminal.command, {
+			repoPath: resolved.project.repoPath,
+			promptUrl: `${apiBase}/tickets/${resolved.project.name}/${id}/prompt`,
+		});
+		context.runCommand(command);
+
+		let updated = ticket;
+		if (ticket.status !== 'in_progress' && context.config.statuses.includes('in_progress')) {
+			updated = await resolved.adapter.update(id, { status: 'in_progress' }, `Transition ticket ${id} to in_progress`);
+			runStatusChangeHook(context.config.onStatusChange, resolved.project.name, updated, ticket.status, 'in_progress');
+			context.events.emit('tickets-updated');
+		}
+		return c.json({ launched: true, terminal: terminal.id, ticket: { ...updated, project: resolved.project.name } });
 	});
 
 	app.get('/api/tickets/:project/:id/revisions', async (c) => {

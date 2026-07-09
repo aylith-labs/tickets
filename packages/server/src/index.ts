@@ -3,6 +3,7 @@ export { createContext, type ServerContext } from './context';
 export { EventBus, type EventListener } from './events';
 export { runStatusChangeHook } from './hooks';
 export { DATA_BRANCH, type InitOptions, initProject } from './init';
+export { buildLaunchCommand, type LaunchValues, runDetached } from './launch';
 export {
 	CONFIG_PATH,
 	createAdapter,
