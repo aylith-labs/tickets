@@ -22,10 +22,53 @@ export class AyTicketList extends LitElement {
 				gap: 1.4rem;
 			}
 
+			.panes {
+				display: flex;
+				align-items: flex-start;
+			}
+
 			.list-section {
 				display: flex;
 				flex-direction: column;
 				gap: 0.7rem;
+				flex: 1;
+				min-width: 0;
+			}
+
+			.splitter {
+				flex: 0 0 9px;
+				align-self: stretch;
+				min-height: 60vh;
+				cursor: col-resize;
+				touch-action: none;
+				user-select: none;
+				position: relative;
+				margin: 0 2px;
+			}
+
+			.splitter::before {
+				content: '';
+				position: absolute;
+				top: 0;
+				bottom: 0;
+				left: 4px;
+				width: 1px;
+				background: var(--_border);
+			}
+
+			.splitter:hover::before,
+			.splitter.dragging::before {
+				left: 3px;
+				width: 3px;
+				border-radius: 2px;
+				background: var(--_accent);
+			}
+
+			.detail-pane {
+				flex: 0 0 auto;
+				min-width: 18rem;
+				position: sticky;
+				top: 0.5rem;
 			}
 
 			.form-slot {
@@ -34,12 +77,22 @@ export class AyTicketList extends LitElement {
 
 			.toolbar {
 				display: flex;
+				flex-wrap: wrap;
 				align-items: center;
 				justify-content: space-between;
-				gap: 1rem;
+				gap: 0.5rem 1rem;
 				font-size: 0.8125rem;
 				color: var(--_text-muted);
 				padding: 0 0.15rem;
+			}
+
+			.controls {
+				flex-wrap: wrap;
+				row-gap: 0.5rem;
+			}
+
+			.toolbar label {
+				white-space: nowrap;
 			}
 
 			.count {
@@ -177,6 +230,9 @@ export class AyTicketList extends LitElement {
 	@state() private view: 'list' | 'board' = 'list';
 	@state() private dragStatus = '';
 	@state() private formOpen = false;
+	@state() private docked = localStorage.getItem('ay-tickets:detail-dock') === '1';
+	@state() private detailWidth = Number(localStorage.getItem('ay-tickets:detail-width')) || 460;
+	@state() private splitting = false;
 
 	private unsubscribe?: () => void;
 	private toastTimer?: ReturnType<typeof setTimeout>;
@@ -235,6 +291,40 @@ export class AyTicketList extends LitElement {
 	private setView(view: 'list' | 'board'): void {
 		this.view = view;
 		localStorage.setItem('ay-tickets:view', view);
+	}
+
+	private toggleDock(): void {
+		this.docked = !this.docked;
+		localStorage.setItem('ay-tickets:detail-dock', this.docked ? '1' : '0');
+	}
+
+	private onSplitterDown(event: PointerEvent): void {
+		event.preventDefault();
+		const splitter = event.currentTarget as HTMLElement;
+		try {
+			splitter.setPointerCapture(event.pointerId);
+		} catch {
+			// synthetic pointer ids can't be captured — dragging still works over the splitter
+		}
+		this.splitting = true;
+		const startX = event.clientX;
+		const startWidth = this.detailWidth;
+		const panes = this.renderRoot.querySelector('.panes') as HTMLElement;
+		const maxWidth = Math.max(320, panes.getBoundingClientRect().width - 320);
+		const onMove = (moveEvent: PointerEvent) => {
+			const next = startWidth + (startX - moveEvent.clientX);
+			this.detailWidth = Math.min(maxWidth, Math.max(300, Math.round(next)));
+		};
+		const onUp = () => {
+			this.splitting = false;
+			splitter.removeEventListener('pointermove', onMove);
+			splitter.removeEventListener('pointerup', onUp);
+			splitter.removeEventListener('pointercancel', onUp);
+			localStorage.setItem('ay-tickets:detail-width', String(this.detailWidth));
+		};
+		splitter.addEventListener('pointermove', onMove);
+		splitter.addEventListener('pointerup', onUp);
+		splitter.addEventListener('pointercancel', onUp);
 	}
 
 	private async onColumnDrop(event: DragEvent, status: string): Promise<void> {
@@ -310,7 +400,9 @@ export class AyTicketList extends LitElement {
 				@ay-close=${() => {
 					this.selected = undefined;
 				}}
+				@ay-dock-toggle=${() => this.toggleDock()}
 			>
+				<div class="panes">
 				<div class="list-section">
 					<div class="toolbar">
 						<span class="count">${this.tickets.length} ticket${this.tickets.length === 1 ? '' : 's'}</span>
@@ -374,7 +466,30 @@ export class AyTicketList extends LitElement {
 				</div>
 
 				${
-					this.selected
+					this.selected && this.docked
+						? html`
+							<div
+								class="splitter ${this.splitting ? 'dragging' : ''}"
+								role="separator"
+								aria-orientation="vertical"
+								aria-label="Resize the detail pane"
+								@pointerdown=${this.onSplitterDown}
+							></div>
+							<div class="detail-pane" style="width: ${this.detailWidth}px">
+								<ay-ticket-detail
+									docked
+									.ticket=${this.selected}
+									.client=${this.client}
+									.meta=${this.meta}
+								></ay-ticket-detail>
+							</div>
+						`
+						: null
+				}
+				</div>
+
+				${
+					this.selected && !this.docked
 						? html`<ay-ticket-detail .ticket=${this.selected} .client=${this.client} .meta=${this.meta}></ay-ticket-detail>`
 						: null
 				}

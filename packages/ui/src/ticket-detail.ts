@@ -34,24 +34,15 @@ export class AyTicketDetail extends LitElement {
 				gap: 1rem;
 			}
 
-			/* Docked: a right-side drawer with no dim, so the list stays usable. */
-			.backdrop.docked {
-				inset: 0 0 0 auto;
-				width: min(30rem, 100vw);
-				padding: 0;
-				background: transparent;
-				align-items: stretch;
+			/* Docked: an in-flow pane — the parent splits the layout and sizes it. */
+			:host([docked]) {
+				display: block;
+				min-width: 0;
 			}
 
-			.backdrop.docked .panel {
+			.panel.inline {
 				width: 100%;
-				height: 100%;
-				max-height: none;
-				border-radius: 0;
-				border-top: none;
-				border-right: none;
-				border-bottom: none;
-				box-shadow: -12px 0 32px light-dark(rgb(0 0 0 / 0.12), rgb(0 0 0 / 0.45));
+				max-height: calc(100dvh - 2rem);
 			}
 
 			.icon-btn {
@@ -222,11 +213,13 @@ export class AyTicketDetail extends LitElement {
 	@property({ attribute: false }) client!: TicketsClient;
 	@property({ attribute: false }) meta?: TicketsMeta;
 
+	/** In-flow side pane (parent lays it out) instead of a centered modal. */
+	@property({ type: Boolean, reflect: true }) docked = false;
+
 	@state() private editing = false;
 	@state() private revisions: TicketRevision[] = [];
 	@state() private uploading = '';
 	@state() private uploadError = '';
-	@state() private docked = localStorage.getItem('ay-tickets:detail-dock') === '1';
 
 	private readonly onKeydown = (event: KeyboardEvent) => {
 		if (event.key === 'Escape') this.close();
@@ -253,8 +246,7 @@ export class AyTicketDetail extends LitElement {
 	}
 
 	private toggleDock(): void {
-		this.docked = !this.docked;
-		localStorage.setItem('ay-tickets:detail-dock', this.docked ? '1' : '0');
+		this.dispatchEvent(new CustomEvent('ay-dock-toggle', { bubbles: true, composed: true }));
 	}
 
 	private async loadRevisions(): Promise<void> {
@@ -314,16 +306,22 @@ export class AyTicketDetail extends LitElement {
 	}
 
 	render() {
+		if (this.docked) {
+			return html`<div class="panel inline" role="region" aria-label="Ticket ${this.ticket.id}">${this.renderBody()}</div>`;
+		}
+		return html`
+			<div class="backdrop" @click=${(event: Event) => event.target === event.currentTarget && this.close()}>
+				<div class="panel" role="dialog" aria-modal="true" aria-label="Ticket ${this.ticket.id}">${this.renderBody()}</div>
+			</div>
+		`;
+	}
+
+	private renderBody() {
 		const { ticket } = this;
 		const before = ticket.attachments.filter((attachment) => attachment.kind === 'before');
 		const after = ticket.attachments.filter((attachment) => attachment.kind === 'after');
 		const other = ticket.attachments.filter((attachment) => attachment.kind === 'other');
 		return html`
-			<div
-				class="backdrop ${this.docked ? 'docked' : ''}"
-				@click=${(event: Event) => event.target === event.currentTarget && this.close()}
-			>
-				<div class="panel" role="dialog" aria-modal=${this.docked ? 'false' : 'true'} aria-label="Ticket ${ticket.id}">
 					<header>
 						<span class="mono">${ticket.project} / #${ticket.id}</span>
 						<span class="spacer"></span>
@@ -455,8 +453,6 @@ export class AyTicketDetail extends LitElement {
 							${ticket.archived ? 'Archived' : 'Archive'}
 						</button>
 					</footer>
-				</div>
-			</div>
 		`;
 	}
 }
