@@ -13,8 +13,8 @@
 		"typecheck": "tsc --noEmit",
 		"build": "bun run --cwd packages/core build && bun run --cwd packages/ui build && bun run --cwd packages/server build && bun run --cwd packages/tui build",
 		"publish:all": "bash scripts/publish.sh",
-		"build:bin": "bun run build:web && bun build packages/server/src/binary.ts --compile --outfile dist-bin/tickets && bun build packages/tui/src/index.tsx --compile --outfile dist-bin/tickets-tui",
-		"build:web": "bun build apps/web/src/main.ts --outdir apps/web/dist --minify && bun build packages/ui/src/index.ts --outfile apps/web/dist/components.js --minify && cp apps/web/index.html apps/web/dist/index.html"
+		"build:bin": "bun run build:web && bun build packages/server/src/binary.ts --compile --conditions=bun --outfile dist-bin/tickets && bun build packages/tui/src/index.tsx --compile --conditions=bun --outfile dist-bin/tickets-tui",
+		"build:web": "bun build apps/web/src/main.ts --outdir apps/web/dist --conditions=bun --minify && bun build packages/ui/src/index.ts --outfile apps/web/dist/components.js --conditions=bun --minify && cp apps/web/index.html apps/web/dist/index.html"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.5.3",

@@ -40,8 +40,8 @@ jobs:
             triple="${targets[$name]}"
             ext=""
             [[ "$name" == windows-* ]] && ext=".exe"
-            bun build packages/server/src/binary.ts --compile --target="$triple" --outfile "dist-bin/tickets-$name$ext"
-            bun build packages/tui/src/index.tsx --compile --target="$triple" --outfile "dist-bin/tickets-tui-$name$ext"
+            bun build packages/server/src/binary.ts --compile --conditions=bun --target="$triple" --outfile "dist-bin/tickets-$name$ext"
+            bun build packages/tui/src/index.tsx --compile --conditions=bun --target="$triple" --outfile "dist-bin/tickets-tui-$name$ext"
           done
           ls -la dist-bin
 
