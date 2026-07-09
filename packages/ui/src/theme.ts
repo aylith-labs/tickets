@@ -7,6 +7,12 @@ import { css } from 'lit';
  * warm-stone surfaces and a copper accent.
  */
 export const tokens = css`
+	*,
+	*::before,
+	*::after {
+		box-sizing: border-box;
+	}
+
 	:host {
 		/* Inherit color-scheme from the host root so its light/dark/system choice
 		   (or an app's forced theme) drives the light-dark() fallbacks. */

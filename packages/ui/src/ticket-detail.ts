@@ -17,13 +17,13 @@ export class AyTicketDetail extends LitElement {
 				display: flex;
 				align-items: flex-start;
 				justify-content: center;
-				padding: 4rem 1rem 2rem;
+				padding: 2.5rem 1rem;
 				z-index: 40;
 			}
 
 			.panel {
 				width: min(46rem, 100%);
-				max-height: calc(100dvh - 6rem);
+				max-height: calc(100dvh - 5rem);
 				overflow-y: auto;
 				background: var(--_bg);
 				border: 1px solid var(--_border);
@@ -32,6 +32,48 @@ export class AyTicketDetail extends LitElement {
 				display: flex;
 				flex-direction: column;
 				gap: 1rem;
+			}
+
+			/* Docked: a right-side drawer with no dim, so the list stays usable. */
+			.backdrop.docked {
+				inset: 0 0 0 auto;
+				width: min(30rem, 100vw);
+				padding: 0;
+				background: transparent;
+				align-items: stretch;
+			}
+
+			.backdrop.docked .panel {
+				width: 100%;
+				height: 100%;
+				max-height: none;
+				border-radius: 0;
+				border-top: none;
+				border-right: none;
+				border-bottom: none;
+				box-shadow: -12px 0 32px light-dark(rgb(0 0 0 / 0.12), rgb(0 0 0 / 0.45));
+			}
+
+			.icon-btn {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				width: 2rem;
+				height: 2rem;
+				border: 1px solid var(--_border);
+				border-radius: var(--_radius);
+				background: var(--_surface);
+				color: var(--_text-muted);
+			}
+
+			.icon-btn:hover {
+				background: var(--_surface-raised);
+				color: var(--_text);
+			}
+
+			.icon-btn.active {
+				color: var(--_accent);
+				border-color: color-mix(in srgb, var(--_accent) 45%, var(--_border));
 			}
 
 			header {
@@ -184,10 +226,35 @@ export class AyTicketDetail extends LitElement {
 	@state() private revisions: TicketRevision[] = [];
 	@state() private uploading = '';
 	@state() private uploadError = '';
+	@state() private docked = localStorage.getItem('ay-tickets:detail-dock') === '1';
+
+	private readonly onKeydown = (event: KeyboardEvent) => {
+		if (event.key === 'Escape') this.close();
+	};
 
 	async connectedCallback(): Promise<void> {
 		super.connectedCallback();
+		document.addEventListener('keydown', this.onKeydown);
 		await this.loadRevisions();
+	}
+
+	disconnectedCallback(): void {
+		super.disconnectedCallback();
+		document.removeEventListener('keydown', this.onKeydown);
+	}
+
+	/** While docked the element stays mounted across ticket switches — reload history. */
+	updated(changed: Map<string, unknown>): void {
+		const previous = changed.get('ticket') as TicketWithProject | undefined;
+		if (previous && (previous.id !== this.ticket.id || previous.project !== this.ticket.project)) {
+			this.editing = false;
+			void this.loadRevisions();
+		}
+	}
+
+	private toggleDock(): void {
+		this.docked = !this.docked;
+		localStorage.setItem('ay-tickets:detail-dock', this.docked ? '1' : '0');
 	}
 
 	private async loadRevisions(): Promise<void> {
@@ -252,8 +319,11 @@ export class AyTicketDetail extends LitElement {
 		const after = ticket.attachments.filter((attachment) => attachment.kind === 'after');
 		const other = ticket.attachments.filter((attachment) => attachment.kind === 'other');
 		return html`
-			<div class="backdrop" @click=${(event: Event) => event.target === event.currentTarget && this.close()}>
-				<div class="panel" role="dialog" aria-modal="true" aria-label="Ticket ${ticket.id}">
+			<div
+				class="backdrop ${this.docked ? 'docked' : ''}"
+				@click=${(event: Event) => event.target === event.currentTarget && this.close()}
+			>
+				<div class="panel" role="dialog" aria-modal=${this.docked ? 'false' : 'true'} aria-label="Ticket ${ticket.id}">
 					<header>
 						<span class="mono">${ticket.project} / #${ticket.id}</span>
 						<span class="spacer"></span>
@@ -263,6 +333,17 @@ export class AyTicketDetail extends LitElement {
 									html`<option value=${status} ?selected=${status === ticket.status}>${status.replace(/_/g, ' ')}</option>`,
 							)}
 						</select>
+						<button
+							class="icon-btn ${this.docked ? 'active' : ''}"
+							aria-label=${this.docked ? 'Undock the panel' : 'Dock the panel to the side'}
+							aria-pressed=${this.docked}
+							@click=${this.toggleDock}
+						>
+							<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+								<rect x="3.75" y="4.75" width="16.5" height="14.5" rx="2"></rect>
+								<path d="M15 4.75v14.5"></path>
+							</svg>
+						</button>
 						<button class="btn" @click=${this.close}>Close</button>
 					</header>
 
