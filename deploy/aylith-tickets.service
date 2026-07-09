@@ -1,0 +1,14 @@
+[Unit]
+Description=aylith tickets daemon (tickets.lvh.me)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/projects/aylith-labs/tickets
+ExecStartPre=%h/.bun/bin/bun run build:web
+ExecStart=%h/.bun/bin/bun packages/server/src/cli.ts serve
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
