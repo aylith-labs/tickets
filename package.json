@@ -11,7 +11,7 @@
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
 		"typecheck": "tsc --noEmit",
-		"build:web": "bun build apps/web/src/main.ts --outdir apps/web/dist --minify && cp apps/web/index.html apps/web/dist/index.html"
+		"build:web": "bun build apps/web/src/main.ts --outdir apps/web/dist --minify && bun build packages/ui/src/index.ts --outfile apps/web/dist/components.js --minify && cp apps/web/index.html apps/web/dist/index.html"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.5.3",
