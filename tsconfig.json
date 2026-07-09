@@ -12,6 +12,7 @@
 		"verbatimModuleSyntax": true,
 		"experimentalDecorators": true,
 		"useDefineForClassFields": false,
+		"jsx": "react-jsx",
 		"paths": {
 			"@aylith/tickets-core": ["./packages/core/src/index.ts"],
 			"@aylith/tickets-server": ["./packages/server/src/index.ts"],

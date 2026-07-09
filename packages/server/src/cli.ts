@@ -2,6 +2,7 @@
 import { initProject } from './init';
 import { readDaemonConfig } from './registry';
 import { startDaemon } from './serve';
+import { runTui } from './tui';
 import type { AdapterKind } from './types/AdapterKind';
 
 const HELP = `tickets — pluggable personal issue tracker
@@ -9,6 +10,7 @@ const HELP = `tickets — pluggable personal issue tracker
 Usage:
   tickets init [--name <project>] [--adapter git|folder]   Register the repo you are in
   tickets serve [--port <port>]                            Start the daemon
+  tickets tui [--api-base <url>]                           Browse tickets in the terminal
   tickets list                                             Print registered projects
   tickets help
 `;
@@ -40,6 +42,10 @@ const main = async (): Promise<void> => {
 		case 'serve': {
 			const portFlag = readFlag(rest, '--port');
 			await startDaemon({ port: portFlag ? Number.parseInt(portFlag, 10) : undefined });
+			return;
+		}
+		case 'tui': {
+			runTui(rest);
 			return;
 		}
 		case 'list': {

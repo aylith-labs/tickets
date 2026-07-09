@@ -1,0 +1,43 @@
+{
+	"name": "@aylith/tickets-tui",
+	"version": "0.1.0",
+	"description": "Terminal UI for @aylith/tickets — browse and act on tickets across all projects",
+	"license": "MIT",
+	"type": "module",
+	"bin": {
+		"tickets-tui": "./dist/index.js"
+	},
+	"files": [
+		"dist"
+	],
+	"engines": {
+		"bun": ">=1.2.0"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/aylith-labs/tickets.git",
+		"directory": "packages/tui"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"build": "tsup",
+		"start": "bun run src/index.tsx",
+		"clean": "rm -rf dist"
+	},
+	"dependencies": {
+		"@aylith/tickets-core": "workspace:*",
+		"@inkjs/ui": "2.0.0",
+		"clipboardy": "5.3.1",
+		"fuzzysort": "3.1.0",
+		"ink": "7.1.0",
+		"react": "19.2.7"
+	},
+	"devDependencies": {
+		"@types/react": "19.2.17",
+		"ink-testing-library": "4.0.0",
+		"tsup": "8.5.1",
+		"typescript": "7.0.2"
+	}
+}

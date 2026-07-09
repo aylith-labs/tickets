@@ -10,8 +10,9 @@ prompt, open a terminal (Windows Terminal, Tabby, …) already running
 | Package | What |
 |---|---|
 | [`@aylith/tickets-core`](https://www.npmjs.com/package/@aylith/tickets-core) | Types, markdown ticket format, storage adapters (git data branch / plain folder), prompt composer |
-| [`@aylith/tickets-server`](https://www.npmjs.com/package/@aylith/tickets-server) | `tickets` CLI (`init`, `serve`) — Hono daemon: REST API, SSE, terminal launch, AI enrich, media pipeline |
+| [`@aylith/tickets-server`](https://www.npmjs.com/package/@aylith/tickets-server) | `tickets` CLI (`init`, `serve`, `tui`) — Hono daemon: REST API, SSE, terminal launch, AI enrich, media pipeline |
 | [`@aylith/tickets-ui`](https://www.npmjs.com/package/@aylith/tickets-ui) | Framework-agnostic Lit web components (`<ay-ticket-list>`, `<ay-ticket-card>`, …), themeable via CSS custom properties |
+| [`@aylith/tickets-tui`](https://www.npmjs.com/package/@aylith/tickets-tui) | Terminal UI (`tickets-tui` / `tickets tui`) — browse and act on tickets across all projects, Ink + React |
 | `apps/web` | Central UI served by the daemon — all projects at `/`, per-project at `/<project>` |
 
 ```bash
