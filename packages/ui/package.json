@@ -1,0 +1,12 @@
+{
+	"name": "@aylith/tickets-ui",
+	"version": "0.1.0",
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"dependencies": {
+		"@aylith/tickets-core": "workspace:*",
+		"lit": "3.3.3"
+	}
+}

@@ -1,0 +1,90 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tickets</title>
+<style>
+	:root {
+		color-scheme: light dark;
+	}
+
+	:root[data-theme='light'] {
+		color-scheme: light;
+	}
+
+	:root[data-theme='dark'] {
+		color-scheme: dark;
+	}
+
+	body {
+		margin: 0;
+		min-height: 100dvh;
+		background: light-dark(#fafafa, #131316);
+		color: light-dark(#18181b, #ececf1);
+		font: 15px/1.5 system-ui, sans-serif;
+	}
+
+	.shell {
+		max-width: 52rem;
+		margin: 0 auto;
+		padding: 1.5rem 1rem 4rem;
+	}
+
+	header {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		margin-bottom: 1.25rem;
+	}
+
+	h1 {
+		font-size: 1.1rem;
+		margin: 0;
+		letter-spacing: -0.01em;
+	}
+
+	h1 a {
+		color: inherit;
+		text-decoration: none;
+	}
+
+	#projects {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+		flex: 1;
+	}
+
+	.chip {
+		font-size: 0.75rem;
+		padding: 0.2rem 0.65rem;
+		border-radius: 999px;
+		border: 1px solid light-dark(#e4e4e7, #33333a);
+		color: light-dark(#71717a, #9d9daa);
+		text-decoration: none;
+	}
+
+	.chip.active {
+		background: light-dark(#7c3aed, #a78bfa);
+		border-color: transparent;
+		color: light-dark(#fff, #17171c);
+	}
+
+	#theme-toggle {
+		font: inherit;
+		font-size: 0.75rem;
+		padding: 0.25rem 0.65rem;
+		border-radius: 999px;
+		border: 1px solid light-dark(#e4e4e7, #33333a);
+		background: none;
+		color: light-dark(#71717a, #9d9daa);
+		cursor: pointer;
+	}
+</style>
+<div class="shell">
+	<header>
+		<h1><a href="/">tickets</a></h1>
+		<nav id="projects" aria-label="Projects"></nav>
+		<button id="theme-toggle" aria-label="Theme"></button>
+	</header>
+	<main id="app"></main>
+</div>
+<script type="module" src="./main.js"></script>

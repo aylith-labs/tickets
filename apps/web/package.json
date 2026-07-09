@@ -1,0 +1,9 @@
+{
+	"name": "tickets-web",
+	"private": true,
+	"version": "0.1.0",
+	"type": "module",
+	"dependencies": {
+		"@aylith/tickets-ui": "workspace:*"
+	}
+}
