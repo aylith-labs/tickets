@@ -8,6 +8,7 @@ export { EventBus, type EventListener } from './events';
 export { runStatusChangeHook } from './hooks';
 export { DATA_BRANCH, type InitOptions, initProject } from './init';
 export { buildLaunchCommand, type LaunchValues, runDetached } from './launch';
+export { attachmentTypeForFilename, type PublishInput, publishAttachment } from './media';
 export {
 	CONFIG_PATH,
 	createAdapter,

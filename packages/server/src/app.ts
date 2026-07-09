@@ -210,6 +210,42 @@ export const createApp = (context: ServerContext): Hono => {
 		}
 	});
 
+	app.post('/api/tickets/:project/:id/attachments', async (c) => {
+		const resolved = resolveProject(c.req.param('project'));
+		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
+		const id = c.req.param('id');
+		const ticket = await resolved.adapter.get(id);
+		if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
+		if (!context.config.media) return c.json({ error: 'Media storage is not configured' }, 503);
+
+		const body = await c.req.parseBody();
+		const file = body.file;
+		if (!(file instanceof File)) return c.json({ error: 'Multipart field "file" is required' }, 400);
+		const kind = body.kind === 'before' || body.kind === 'after' ? body.kind : 'other';
+		const label = typeof body.label === 'string' && body.label.length > 0 ? body.label : undefined;
+
+		try {
+			const attachment = await context.publishMedia({
+				media: context.config.media,
+				projectName: resolved.project.name,
+				ticketId: id,
+				filename: file.name,
+				kind,
+				label,
+				data: new Uint8Array(await file.arrayBuffer()),
+			});
+			const updated = await resolved.adapter.update(
+				id,
+				{ attachments: [...ticket.attachments, attachment] },
+				`Attach ${kind} media to ticket ${id}`,
+			);
+			context.events.emit('tickets-updated');
+			return c.json({ ...updated, project: resolved.project.name, attachment }, 201);
+		} catch (error) {
+			return c.json({ error: error instanceof Error ? error.message : 'Upload failed' }, 502);
+		}
+	});
+
 	app.get('/api/events', (c) =>
 		streamSSE(c, async (stream) => {
 			const unsubscribe = context.events.subscribe((event) => {
