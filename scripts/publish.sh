@@ -11,7 +11,7 @@ bun install --frozen-lockfile
 bun run build
 
 # core first — the others declare it as a dependency.
-for pkg in core ui server; do
+for pkg in core ui server tui; do
 	version=$(cd "packages/$pkg" && node -p "require('./package.json').version")
 	name=$(cd "packages/$pkg" && node -p "require('./package.json').name")
 	echo "==> publishing $name@$version"
