@@ -200,6 +200,14 @@ export const createApp = (context: ServerContext): Hono => {
 		return c.json({ revisions });
 	});
 
+	app.get('/api/tickets/:project/:id/revisions/:ref', async (c) => {
+		const resolved = resolveProject(c.req.param('project'));
+		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
+		const revision = await resolved.adapter.getRevision(c.req.param('id'), c.req.param('ref'));
+		if (!revision) return c.json({ error: 'Revision not found' }, 404);
+		return c.json({ ...revision, project: resolved.project.name });
+	});
+
 	app.post('/api/tickets/:project/:id/revisions/:ref/restore', async (c) => {
 		const resolved = resolveProject(c.req.param('project'));
 		if (!resolved) return c.json({ error: 'Unknown project' }, 404);

@@ -24,16 +24,28 @@ export class AyTicketList extends LitElement {
 			.toolbar {
 				display: flex;
 				align-items: center;
+				justify-content: space-between;
 				gap: 0.75rem;
 				font-size: 0.8125rem;
 				color: var(--_text-muted);
+				padding: 0 0.15rem;
+			}
+
+			.count {
+				font-variant-numeric: tabular-nums;
 			}
 
 			.toolbar label {
 				display: inline-flex;
 				align-items: center;
-				gap: 0.35rem;
+				gap: 0.4rem;
 				cursor: pointer;
+				user-select: none;
+				border-radius: var(--_radius);
+			}
+
+			.toolbar label:hover {
+				color: var(--_text);
 			}
 
 			.cards {
@@ -141,7 +153,7 @@ export class AyTicketList extends LitElement {
 				<ay-ticket-form .client=${this.client} project=${this.project}></ay-ticket-form>
 
 				<div class="toolbar">
-					<span>${this.tickets.length} ticket${this.tickets.length === 1 ? '' : 's'}</span>
+					<span class="count">${this.tickets.length} ticket${this.tickets.length === 1 ? '' : 's'}</span>
 					<label>
 						<input
 							type="checkbox"

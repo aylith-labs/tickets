@@ -63,7 +63,7 @@ export const tokens = css`
 		background: var(--_accent);
 	}
 
-	input,
+	input:not([type='checkbox']):not([type='radio']),
 	textarea,
 	select {
 		font: inherit;
@@ -72,6 +72,15 @@ export const tokens = css`
 		border: 1px solid var(--_border);
 		border-radius: var(--_radius);
 		padding: 0.45rem 0.65rem;
+	}
+
+	input[type='checkbox'],
+	input[type='radio'] {
+		accent-color: var(--_accent);
+		width: 0.9rem;
+		height: 0.9rem;
+		margin: 0;
+		cursor: pointer;
 	}
 
 	input:focus-visible,

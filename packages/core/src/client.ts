@@ -96,6 +96,12 @@ export class TicketsClient {
 		return ((await response.json()) as { revisions: TicketRevision[] }).revisions;
 	}
 
+	/** The ticket's content as of a specific revision (without restoring it). */
+	async revision(project: string, id: string, ref: string): Promise<TicketWithProject> {
+		const response = await ensureOk(await fetch(`${this.apiBase}/tickets/${project}/${id}/revisions/${ref}`));
+		return (await response.json()) as TicketWithProject;
+	}
+
 	async restore(project: string, id: string, ref: string): Promise<TicketWithProject> {
 		const response = await ensureOk(
 			await fetch(`${this.apiBase}/tickets/${project}/${id}/revisions/${ref}/restore`, { method: 'POST' }),

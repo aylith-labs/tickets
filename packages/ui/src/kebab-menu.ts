@@ -1,4 +1,4 @@
-import { css, html, LitElement } from 'lit';
+import { css, html, LitElement, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { tokens } from './theme';
 
@@ -7,6 +7,8 @@ export type KebabItem = {
 	action: () => void | Promise<void>;
 	danger?: boolean;
 	disabled?: boolean;
+	/** Rich flyout shown beside the menu while the item is hovered/focused. */
+	preview?: TemplateResult;
 };
 
 @customElement('ay-kebab-menu')
@@ -70,11 +72,68 @@ export class AyKebabMenu extends LitElement {
 				cursor: default;
 				opacity: 0.6;
 			}
+
+			.preview {
+				position: absolute;
+				right: calc(100% + 8px);
+				top: 0;
+				width: 19rem;
+				background: var(--_surface);
+				border: 1px solid var(--_border);
+				border-radius: var(--_radius);
+				box-shadow: 0 8px 24px light-dark(rgb(0 0 0 / 0.12), rgb(0 0 0 / 0.5));
+				padding: 0.75rem 0.85rem;
+				white-space: normal;
+				display: flex;
+				flex-direction: column;
+				gap: 0.55rem;
+				font-size: 0.8125rem;
+				cursor: default;
+			}
+
+			.preview .preview-title {
+				font-weight: 600;
+				margin: 0;
+			}
+
+			.preview .preview-note {
+				color: var(--_text-muted);
+				font-size: 0.75rem;
+				line-height: 1.45;
+				margin: 0;
+			}
+
+			.preview .preview-label {
+				font-size: 0.6875rem;
+				font-weight: 600;
+				text-transform: uppercase;
+				letter-spacing: 0.05em;
+				color: var(--_text-muted);
+				margin: 0 0 0.25rem;
+			}
+
+			.preview .preview-block {
+				margin: 0;
+				padding: 0.45rem 0.55rem;
+				background: var(--_surface-raised);
+				border-radius: calc(var(--_radius) - 2px);
+				font-size: 0.75rem;
+				line-height: 1.45;
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+				max-height: 9rem;
+				overflow: hidden;
+			}
+
+			.preview .preview-muted {
+				color: var(--_text-muted);
+			}
 		`,
 	];
 
 	@property({ attribute: false }) items: KebabItem[] = [];
 	@state() private open = false;
+	@state() private preview?: TemplateResult;
 
 	private readonly onOutsideClick = (event: MouseEvent) => {
 		if (!event.composedPath().includes(this)) this.close();
@@ -95,11 +154,13 @@ export class AyKebabMenu extends LitElement {
 			this.open = true;
 			document.addEventListener('click', this.onOutsideClick);
 			document.addEventListener('keydown', this.onKeydown);
+			this.dispatchEvent(new CustomEvent('ay-menu-open', { bubbles: true, composed: true }));
 		}
 	}
 
 	private close(): void {
 		this.open = false;
+		this.preview = undefined;
 		document.removeEventListener('click', this.onOutsideClick);
 		document.removeEventListener('keydown', this.onKeydown);
 	}
@@ -129,7 +190,14 @@ export class AyKebabMenu extends LitElement {
 			</button>
 			${
 				this.open
-					? html`<div class="menu" role="menu" @click=${(event: Event) => event.stopPropagation()}>
+					? html`<div
+						class="menu"
+						role="menu"
+						@click=${(event: Event) => event.stopPropagation()}
+						@mouseleave=${() => {
+							this.preview = undefined;
+						}}
+					>
 						${this.items.map(
 							(item) => html`
 								<button
@@ -137,11 +205,18 @@ export class AyKebabMenu extends LitElement {
 									role="menuitem"
 									?disabled=${item.disabled}
 									@click=${() => this.run(item)}
+									@mouseenter=${() => {
+										this.preview = item.preview;
+									}}
+									@focus=${() => {
+										this.preview = item.preview;
+									}}
 								>
 									${item.label}
 								</button>
 							`,
 						)}
+						${this.preview ? html`<div class="preview">${this.preview}</div>` : null}
 					</div>`
 					: null
 			}

@@ -1,10 +1,19 @@
+import type { TicketRevision } from '@aylith/tickets-core';
 import { css, html, LitElement } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import type { TicketsClient, TicketsMeta, TicketWithProject } from './client';
 import type { KebabItem } from './kebab-menu';
 import { tokens } from './theme';
 import './kebab-menu';
 import './status-chip';
+
+/** Present only when the ticket's most recent change is an AI enrich. */
+type UndoState = {
+	/** The revision the undo restores (the state right before the enrich). */
+	target: TicketRevision;
+	/** Ticket content at that revision — what the undo will bring back. */
+	restored: TicketWithProject;
+};
 
 @customElement('ay-ticket-card')
 export class AyTicketCard extends LitElement {
@@ -69,6 +78,8 @@ export class AyTicketCard extends LitElement {
 	/** Hide the project badge on single-project embeds. */
 	@property({ type: Boolean }) hideProject = false;
 
+	@state() private undo?: UndoState;
+
 	private notify(message: string): void {
 		this.dispatchEvent(new CustomEvent('ay-notify', { detail: { message }, bubbles: true, composed: true }));
 	}
@@ -83,6 +94,54 @@ export class AyTicketCard extends LitElement {
 		} catch (error) {
 			this.notify(error instanceof Error ? error.message : 'Action failed');
 		}
+	}
+
+	/**
+	 * Runs when the kebab opens: "Undo last enrich" only exists while the
+	 * ticket's most recent revision IS an enrich — and it previews the exact
+	 * content the undo restores.
+	 */
+	private async loadUndoState(): Promise<void> {
+		this.undo = undefined;
+		const { project, id } = this.ticket;
+		try {
+			const [latest, previous] = await this.client.revisions(project, id);
+			if (!latest || !previous || !latest.message.startsWith('Enrich ')) return;
+			const restored = await this.client.revision(project, id, previous.ref);
+			this.undo = { target: previous, restored };
+		} catch {
+			// no revision history (e.g. folder adapter) — keep the item hidden
+		}
+	}
+
+	private undoItem({ target, restored }: UndoState): KebabItem {
+		const { project, id } = this.ticket;
+		const titleChanged = restored.title !== this.ticket.title;
+		const descriptionChanged = restored.description !== this.ticket.description;
+		return {
+			label: 'Undo last enrich',
+			preview: html`
+				<p class="preview-title">Undo the AI enrich</p>
+				<p class="preview-note">
+					Restores the ticket to how it was before the enrich (${new Date(target.at).toLocaleString()}).
+				</p>
+				<div>
+					<p class="preview-label">Title after undo${titleChanged ? '' : ' — unchanged'}</p>
+					<p class="preview-block">${restored.title}</p>
+				</div>
+				<div>
+					<p class="preview-label">Description after undo${descriptionChanged ? '' : ' — unchanged'}</p>
+					<p class="preview-block">${restored.description.trim() || html`<span class="preview-muted">Empty</span>`}</p>
+				</div>
+			`,
+			action: () =>
+				this.guard(async () => {
+					await this.client.restore(project, id, target.ref);
+					this.undo = undefined;
+					this.notify('Enrich undone — previous title and description restored');
+					this.changed();
+				}),
+		};
 	}
 
 	private kebabItems(): KebabItem[] {
@@ -108,43 +167,27 @@ export class AyTicketCard extends LitElement {
 					}),
 			});
 		}
-		items.push(
-			{
-				label: 'Enrich with AI',
-				action: () =>
-					this.guard(async () => {
-						this.notify('Enriching…');
-						await this.client.enrich(project, id);
-						this.notify('Ticket enriched — undo is in the menu');
-						this.changed();
-					}),
-			},
-			{
-				label: 'Undo last enrich',
-				action: () =>
-					this.guard(async () => {
-						const revisions = await this.client.revisions(project, id);
-						const previous = revisions[1];
-						if (!previous) {
-							this.notify('No earlier revision to restore');
-							return;
-						}
-						await this.client.restore(project, id, previous.ref);
-						this.notify('Restored the previous title and description');
-						this.changed();
-					}),
-			},
-			{
-				label: 'Archive',
-				danger: true,
-				action: () =>
-					this.guard(async () => {
-						await this.client.archive(project, id);
-						this.notify(`Ticket ${id} archived`);
-						this.changed();
-					}),
-			},
-		);
+		items.push({
+			label: 'Enrich with AI',
+			action: () =>
+				this.guard(async () => {
+					this.notify('Enriching…');
+					await this.client.enrich(project, id);
+					this.notify('Ticket enriched — undo is in the menu');
+					this.changed();
+				}),
+		});
+		if (this.undo) items.push(this.undoItem(this.undo));
+		items.push({
+			label: 'Archive',
+			danger: true,
+			action: () =>
+				this.guard(async () => {
+					await this.client.archive(project, id);
+					this.notify(`Ticket ${id} archived`);
+					this.changed();
+				}),
+		});
 		return items;
 	}
 
@@ -160,7 +203,7 @@ export class AyTicketCard extends LitElement {
 				${ticket.attachments.length > 0 ? html`<span class="media-count">${ticket.attachments.length} media</span>` : null}
 				${this.hideProject ? null : html`<span class="project">${ticket.project}</span>`}
 				<ay-status-chip status=${ticket.status}></ay-status-chip>
-				<ay-kebab-menu .items=${this.kebabItems()}></ay-kebab-menu>
+				<ay-kebab-menu .items=${this.kebabItems()} @ay-menu-open=${() => void this.loadUndoState()}></ay-kebab-menu>
 			</div>
 		`;
 	}
