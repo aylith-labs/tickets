@@ -1,6 +1,6 @@
 {
 	"name": "@aylith/tickets-tui",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"description": "Terminal UI for @aylith/tickets — browse and act on tickets across all projects",
 	"license": "MIT",
 	"type": "module",
@@ -14,7 +14,9 @@
 		"tickets-tui": "./dist/index.js"
 	},
 	"files": [
-		"dist"
+		"dist",
+		"src",
+		"!src/test"
 	],
 	"engines": {
 		"bun": ">=1.2.0"

@@ -1,6 +1,6 @@
 {
 	"name": "@aylith/tickets-server",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"description": "Hono daemon and CLI for @aylith/tickets — REST API, SSE, terminal launch, AI enrich, media pipeline",
 	"license": "MIT",
 	"type": "module",
@@ -22,7 +22,9 @@
 		"tickets": "./dist/cli.js"
 	},
 	"files": [
-		"dist"
+		"dist",
+		"src",
+		"!src/test"
 	],
 	"engines": {
 		"bun": ">=1.2.0"

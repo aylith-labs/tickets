@@ -1,6 +1,6 @@
 {
 	"name": "@aylith/tickets",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"description": "Everything-in-one package for @aylith/tickets — daemon + CLI, terminal UI, web components, and core types via subpath exports",
 	"license": "MIT",
 	"type": "module",
@@ -35,7 +35,9 @@
 	},
 	"files": [
 		"bin",
-		"dist"
+		"dist",
+		"src",
+		"!src/test"
 	],
 	"engines": {
 		"bun": ">=1.2.0"
