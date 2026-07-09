@@ -165,6 +165,32 @@ export const createApp = (context: ServerContext): Hono => {
 		return c.json({ launched: true, terminal: terminal.id, ticket: { ...updated, project: resolved.project.name } });
 	});
 
+	app.post('/api/tickets/:project/:id/enrich', async (c) => {
+		const resolved = resolveProject(c.req.param('project'));
+		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
+		const id = c.req.param('id');
+		const ticket = await resolved.adapter.get(id);
+		if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
+
+		const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>);
+		const providerId = typeof body.provider === 'string' ? body.provider : context.config.enrich.defaultProvider;
+		const provider = context.config.enrich.providers.find((entry) => entry.id === providerId);
+		if (!provider) return c.json({ error: `Unknown enrich provider ${providerId}` }, 400);
+
+		try {
+			const result = await context.enrich(ticket, provider);
+			const updated = await resolved.adapter.update(
+				id,
+				{ title: result.title, description: result.description },
+				`Enrich ticket ${id}`,
+			);
+			context.events.emit('tickets-updated');
+			return c.json({ ...updated, project: resolved.project.name });
+		} catch (error) {
+			return c.json({ error: error instanceof Error ? error.message : 'Enrich failed' }, 502);
+		}
+	});
+
 	app.get('/api/tickets/:project/:id/revisions', async (c) => {
 		const resolved = resolveProject(c.req.param('project'));
 		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
