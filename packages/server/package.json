@@ -1,0 +1,15 @@
+{
+	"name": "@aylith/tickets-server",
+	"version": "0.1.0",
+	"type": "module",
+	"bin": {
+		"tickets": "./src/cli.ts"
+	},
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"dependencies": {
+		"@aylith/tickets-core": "workspace:*",
+		"hono": "4.12.28"
+	}
+}

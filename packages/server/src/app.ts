@@ -1,0 +1,172 @@
+import { composePrompt, type StorageAdapter, type TicketPatch } from '@aylith/tickets-core';
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { streamSSE } from 'hono/streaming';
+import type { ServerContext } from './context';
+import { runStatusChangeHook } from './hooks';
+import type { ProjectEntry } from './types/ProjectEntry';
+
+const isAllowedOrigin = (origin: string): boolean => {
+	try {
+		const { hostname } = new URL(origin);
+		return (
+			hostname === 'localhost' || hostname === '127.0.0.1' || hostname === 'lvh.me' || hostname.endsWith('.lvh.me')
+		);
+	} catch {
+		return false;
+	}
+};
+
+type ResolvedProject = { project: ProjectEntry; adapter: StorageAdapter };
+
+export const createApp = (context: ServerContext): Hono => {
+	const app = new Hono();
+
+	app.use('/api/*', cors({ origin: (origin) => (isAllowedOrigin(origin) ? origin : undefined) }));
+
+	const resolveProject = (name: string): ResolvedProject | null => {
+		const project = context.config.projects.find((entry) => entry.name === name);
+		const adapter = context.adapters.get(name);
+		return project && adapter ? { project, adapter } : null;
+	};
+
+	app.get('/api/projects', (c) =>
+		c.json({
+			projects: context.config.projects.map(({ name, repoPath, adapter }) => ({ name, repoPath, adapter })),
+			statuses: context.config.statuses,
+			terminals: context.config.terminals.map(({ id, label }) => ({ id, label })),
+			enrichProviders: context.config.enrich.providers.map(({ id }) => id),
+			apiBase: context.config.apiBase,
+		}),
+	);
+
+	app.get('/api/tickets', async (c) => {
+		const projectFilter = c.req.query('project');
+		const includeArchived = c.req.query('archived') === 'true';
+		const projects = projectFilter
+			? context.config.projects.filter(({ name }) => name === projectFilter)
+			: context.config.projects;
+		if (projectFilter && projects.length === 0) return c.json({ error: `Unknown project ${projectFilter}` }, 404);
+		const lists = await Promise.all(
+			projects.map(async ({ name }) => {
+				const adapter = context.adapters.get(name);
+				if (!adapter) return [];
+				const tickets = await adapter.list();
+				return tickets.map((ticket) => ({ ...ticket, project: name }));
+			}),
+		);
+		const tickets = lists.flat().filter((ticket) => includeArchived || !ticket.archived);
+		return c.json({ tickets });
+	});
+
+	app.post('/api/tickets', async (c) => {
+		const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+		if (!body || typeof body.project !== 'string' || typeof body.title !== 'string' || body.title.trim().length === 0) {
+			return c.json({ error: 'project and title are required' }, 400);
+		}
+		const resolved = resolveProject(body.project);
+		if (!resolved) return c.json({ error: `Unknown project ${body.project}` }, 404);
+		const ticket = await resolved.adapter.create({
+			title: body.title.trim(),
+			description: typeof body.description === 'string' ? body.description : undefined,
+		});
+		context.events.emit('tickets-updated');
+		return c.json({ ...ticket, project: resolved.project.name }, 201);
+	});
+
+	app.get('/api/tickets/:project/:id', async (c) => {
+		const resolved = resolveProject(c.req.param('project'));
+		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
+		const ticket = await resolved.adapter.get(c.req.param('id'));
+		if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
+		return c.json({ ...ticket, project: resolved.project.name });
+	});
+
+	app.patch('/api/tickets/:project/:id', async (c) => {
+		const resolved = resolveProject(c.req.param('project'));
+		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
+		const id = c.req.param('id');
+		const current = await resolved.adapter.get(id);
+		if (!current) return c.json({ error: 'Ticket not found' }, 404);
+		const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+		if (!body) return c.json({ error: 'Invalid JSON body' }, 400);
+
+		const patch: TicketPatch = {};
+		if (typeof body.title === 'string' && body.title.trim().length > 0) patch.title = body.title.trim();
+		if (typeof body.description === 'string') patch.description = body.description;
+		if (typeof body.archived === 'boolean') patch.archived = body.archived;
+		if (typeof body.status === 'string') {
+			if (!context.config.statuses.includes(body.status)) {
+				return c.json({ error: `Unknown status ${body.status}. Valid: ${context.config.statuses.join(', ')}` }, 400);
+			}
+			patch.status = body.status;
+		}
+		if (Object.keys(patch).length === 0) return c.json({ error: 'No updatable fields in body' }, 400);
+
+		const message =
+			patch.status && Object.keys(patch).length === 1 ? `Transition ticket ${id} to ${patch.status}` : undefined;
+		const updated = await resolved.adapter.update(id, patch, message);
+		if (patch.status && patch.status !== current.status) {
+			runStatusChangeHook(context.config.onStatusChange, resolved.project.name, updated, current.status, patch.status);
+		}
+		context.events.emit('tickets-updated');
+		return c.json({ ...updated, project: resolved.project.name });
+	});
+
+	app.post('/api/tickets/:project/:id/archive', async (c) => {
+		const resolved = resolveProject(c.req.param('project'));
+		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
+		const ticket = await resolved.adapter.get(c.req.param('id'));
+		if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
+		const archived = await resolved.adapter.archive(ticket.id);
+		context.events.emit('tickets-updated');
+		return c.json({ ...archived, project: resolved.project.name });
+	});
+
+	app.get('/api/tickets/:project/:id/prompt', async (c) => {
+		const resolved = resolveProject(c.req.param('project'));
+		if (!resolved) return c.text('Unknown project', 404);
+		const ticket = await resolved.adapter.get(c.req.param('id'));
+		if (!ticket) return c.text('Ticket not found', 404);
+		const prompt = composePrompt(
+			ticket,
+			{ name: resolved.project.name, repoPath: resolved.project.repoPath },
+			{ apiBase: context.config.apiBase, template: context.config.promptTemplate },
+		);
+		return c.text(prompt, 200, { 'content-type': 'text/plain; charset=utf-8' });
+	});
+
+	app.get('/api/tickets/:project/:id/revisions', async (c) => {
+		const resolved = resolveProject(c.req.param('project'));
+		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
+		const revisions = await resolved.adapter.getRevisions(c.req.param('id'));
+		return c.json({ revisions });
+	});
+
+	app.post('/api/tickets/:project/:id/revisions/:ref/restore', async (c) => {
+		const resolved = resolveProject(c.req.param('project'));
+		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
+		try {
+			const restored = await resolved.adapter.restoreRevision(c.req.param('id'), c.req.param('ref'));
+			context.events.emit('tickets-updated');
+			return c.json({ ...restored, project: resolved.project.name });
+		} catch (error) {
+			return c.json({ error: error instanceof Error ? error.message : 'Restore failed' }, 400);
+		}
+	});
+
+	app.get('/api/events', (c) =>
+		streamSSE(c, async (stream) => {
+			const unsubscribe = context.events.subscribe((event) => {
+				void stream.writeSSE({ event: 'change', data: event });
+			});
+			stream.onAbort(() => unsubscribe());
+			while (!stream.aborted) {
+				await stream.writeSSE({ event: 'ping', data: String(Date.now()) });
+				await stream.sleep(15000);
+			}
+		}),
+	);
+
+	return app;
+};
