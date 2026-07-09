@@ -8,7 +8,8 @@ import { css } from 'lit';
  */
 export const tokens = css`
 	:host {
-		color-scheme: light dark;
+		/* Inherit color-scheme from the host root so its light/dark/system choice
+		   (or an app's forced theme) drives the light-dark() fallbacks. */
 		--_bg: var(--ay-bg, light-dark(#f8f7f4, #131110));
 		--_surface: var(--ay-surface, light-dark(#ffffff, #1c1a16));
 		--_surface-raised: var(--ay-surface-raised, light-dark(#f0eee9, #26231d));
