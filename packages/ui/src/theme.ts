@@ -3,20 +3,21 @@ import { css } from 'lit';
 /**
  * Every visual value routes through an --ay-* custom property so host apps can
  * retheme the components; the light-dark() fallbacks make them presentable
- * (and system-theme-aware) out of the box.
+ * (and system-theme-aware) out of the box. Defaults follow the aylith brand —
+ * warm-stone surfaces and a copper accent.
  */
 export const tokens = css`
 	:host {
 		color-scheme: light dark;
-		--_bg: var(--ay-bg, light-dark(#fafafa, #131316));
-		--_surface: var(--ay-surface, light-dark(#ffffff, #1c1c21));
-		--_surface-raised: var(--ay-surface-raised, light-dark(#f4f4f5, #26262c));
-		--_border: var(--ay-border, light-dark(#e4e4e7, #33333a));
-		--_text: var(--ay-text, light-dark(#18181b, #ececf1));
-		--_text-muted: var(--ay-text-muted, light-dark(#71717a, #9d9daa));
-		--_accent: var(--ay-accent, light-dark(#7c3aed, #a78bfa));
-		--_accent-contrast: var(--ay-accent-contrast, light-dark(#ffffff, #17171c));
-		--_danger: var(--ay-danger, light-dark(#dc2626, #f87171));
+		--_bg: var(--ay-bg, light-dark(#f8f7f4, #131110));
+		--_surface: var(--ay-surface, light-dark(#ffffff, #1c1a16));
+		--_surface-raised: var(--ay-surface-raised, light-dark(#f0eee9, #26231d));
+		--_border: var(--ay-border, light-dark(#e1ddd3, #332f29));
+		--_text: var(--ay-text, light-dark(#1c1a16, #f3efe8));
+		--_text-muted: var(--ay-text-muted, light-dark(#615b50, #b0a08a));
+		--_accent: var(--ay-accent, light-dark(#c97a3a, #e0a86b));
+		--_accent-contrast: var(--ay-accent-contrast, light-dark(#ffffff, #17140f));
+		--_danger: var(--ay-danger, light-dark(#c0492e, #e88a72));
 		--_radius: var(--ay-radius, 8px);
 		--_font: var(--ay-font, inherit);
 		--_font-mono: var(--ay-font-mono, ui-monospace, monospace);
