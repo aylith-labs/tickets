@@ -23,7 +23,9 @@ type ResolvedProject = { project: ProjectEntry; adapter: StorageAdapter };
 export const createApp = (context: ServerContext): Hono => {
 	const app = new Hono();
 
-	app.use('/api/*', cors({ origin: (origin) => (isAllowedOrigin(origin) ? origin : undefined) }));
+	// Covers /api/* and the /components.js bundle — embedded pages on other
+	// *.lvh.me apps fetch the components module cross-origin (CORS-mode).
+	app.use('*', cors({ origin: (origin) => (isAllowedOrigin(origin) ? origin : undefined) }));
 
 	const resolveProject = (name: string): ResolvedProject | null => {
 		const project = context.config.projects.find((entry) => entry.name === name);
