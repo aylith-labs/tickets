@@ -18,9 +18,24 @@ jobs:
           bun-version: latest
 
       - name: Authenticate to npm
-        run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+        run: |
+          if [ -z "${NPM_TOKEN}" ]; then
+            echo "::error::NPM_TOKEN secret is empty — re-add it with the real token value."
+            exit 1
+          fi
+          echo "NPM_TOKEN present (length ${#NPM_TOKEN})"
+          # Write .npmrc to both HOME and the repo root — publish.sh runs `bun publish`
+          # from each package subdir, and bun walks cwd→root→home for .npmrc.
+          {
+            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}"
+            echo "registry=https://registry.npmjs.org/"
+            echo "always-auth=true"
+          } | tee ~/.npmrc "${GITHUB_WORKSPACE}/.npmrc" > /dev/null
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Verify npm auth
+        run: bunx npm whoami --registry https://registry.npmjs.org/
 
       - name: Build and publish
         run: bash scripts/publish.sh
