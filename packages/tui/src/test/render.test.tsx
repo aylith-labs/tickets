@@ -3,11 +3,25 @@ import { render } from 'ink-testing-library';
 import { TicketsApp } from '../TicketsApp';
 
 const META = {
-	projects: [{ name: 'linux-settings', repoPath: '/repo', adapter: 'git' }],
+	projects: [
+		{
+			name: 'linux-settings',
+			repoPath: '/repo',
+			adapter: 'git',
+			location: {
+				kind: 'git',
+				scope: 'central',
+				dataDir: '/store/linux-settings-ab12cd',
+				branch: 'main',
+				pushEnabled: true,
+			},
+		},
+	],
 	statuses: ['todo', 'in_progress', 'in_review', 'done'],
 	terminals: [{ id: 'wt', label: 'Windows Terminal' }],
 	enrichProviders: ['claude-cli'],
 	apiBase: 'http://test/api',
+	storeRoots: { store: '/store', worktrees: '/worktrees' },
 };
 
 const TICKETS = {
@@ -62,6 +76,8 @@ describe('TicketsApp render', () => {
 		expect(frame).toContain('tickets');
 		expect(frame).toContain('all projects');
 		expect(frame).toContain('linux-settings');
+		// the selected ticket's storage location is surfaced
+		expect(frame).toContain('git/central');
 		expect(frame).toContain('#0001');
 		expect(frame).toContain('Surface backup age');
 		// preview pane shows the description

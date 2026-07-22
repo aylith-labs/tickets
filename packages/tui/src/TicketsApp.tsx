@@ -4,7 +4,7 @@ import { Box, Text, useApp, useInput, useStdout } from 'ink';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CommandBar } from './CommandBar';
 import { clipboardHint, copyToClipboard } from './clipboard';
-import { buildRows, groupByProject, type ListRow } from './format';
+import { buildRows, groupByProject, type ListRow, locationLabel } from './format';
 import { HelpModal } from './HelpModal';
 import { TicketList } from './TicketList';
 import { TicketPreview } from './TicketPreview';
@@ -202,6 +202,9 @@ export function TicketsApp({ apiBase }: { apiBase: string }) {
 	});
 
 	const terminalLabel = meta?.terminals[terminalIndex]?.label ?? '—';
+	const selectedLocation = selected
+		? meta?.projects.find((project) => project.name === selected.project)?.location
+		: undefined;
 	const listHeight = Math.max(3, height - 5);
 	const listWidth = Math.floor(width * 0.5);
 
@@ -218,6 +221,11 @@ export function TicketsApp({ apiBase }: { apiBase: string }) {
 					{busy ? ' · working…' : ''}
 				</Text>
 			</Box>
+			{selected && selectedLocation ? (
+				<Text dimColor>
+					{selected.project} · {locationLabel(selectedLocation)}
+				</Text>
+			) : null}
 
 			{error ? (
 				<Box paddingY={1}>

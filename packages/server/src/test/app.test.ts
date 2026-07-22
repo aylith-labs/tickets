@@ -57,7 +57,16 @@ describe('tickets API', () => {
 		const response = await app.request('/api/projects');
 		expect(response.status).toBe(200);
 		const payload = await response.json();
-		expect(payload.projects).toEqual([{ name: 'demo', repoPath: '/tmp/repos/demo', adapter: 'folder' }]);
+		expect(payload.projects).toEqual([
+			{
+				id: 'demo00000001',
+				name: 'demo',
+				repoPath: '/tmp/repos/demo',
+				adapter: 'folder',
+				location: { kind: 'folder', scope: 'repo', dataDir },
+			},
+		]);
+		expect(payload.storeRoots).toEqual({ store: dataDir, worktrees: dataDir });
 		expect(payload.statuses).toEqual([...DEFAULT_STATUSES]);
 		expect(payload.terminals).toEqual([
 			{ id: 'wt', label: 'Windows Terminal' },
@@ -82,6 +91,14 @@ describe('tickets API', () => {
 
 		const getResponse = await app.request('/api/tickets/demo/0001');
 		expect(getResponse.status).toBe(200);
+	});
+
+	test('aggregation tags projectId and ?project= accepts the id', async () => {
+		await app.request('/api/tickets', jsonRequest('POST', { project: 'demo', title: 'By id' }));
+		const byId = await (await app.request('/api/tickets?project=demo00000001')).json();
+		expect(byId.tickets.length).toBe(1);
+		expect(byId.tickets[0].projectId).toBe('demo00000001');
+		expect(byId.tickets[0].project).toBe('demo');
 	});
 
 	test('create validates project and title', async () => {

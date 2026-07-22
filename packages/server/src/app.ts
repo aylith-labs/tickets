@@ -39,15 +39,29 @@ export const createApp = (context: ServerContext): Hono => {
 
 	app.get('/api/projects', (c) =>
 		c.json({
-			projects: context.config.projects.map((project) => ({
-				name: project.name,
-				repoPath: project.repoPath,
-				adapter: projectLocation(project).kind,
-			})),
+			projects: context.config.projects.map((project) => {
+				const location = projectLocation(project);
+				return {
+					id: project.id,
+					name: project.name,
+					repoPath: project.repoPath,
+					adapter: location.kind,
+					unavailable: project.unavailable,
+					location: {
+						kind: location.kind,
+						scope: location.scope,
+						dataDir: location.dataDir,
+						remote: location.remote,
+						branch: location.branch,
+						pushEnabled: location.kind === 'git' ? (location.pushEnabled ?? true) : undefined,
+					},
+				};
+			}),
 			statuses: context.config.statuses,
 			terminals: context.config.terminals.map(({ id, label }) => ({ id, label })),
 			enrichProviders: context.config.enrich.providers.map(({ id }) => id),
 			apiBase: context.config.apiBase,
+			storeRoots: { store: context.config.storeRoot, worktrees: context.config.worktreesRoot },
 		}),
 	);
 
@@ -55,7 +69,7 @@ export const createApp = (context: ServerContext): Hono => {
 		const projectFilter = c.req.query('project');
 		const includeArchived = c.req.query('archived') === 'true';
 		const projects = projectFilter
-			? context.config.projects.filter(({ name }) => name === projectFilter)
+			? context.config.projects.filter((entry) => entry.id === projectFilter || entry.name === projectFilter)
 			: context.config.projects;
 		if (projectFilter && projects.length === 0) return c.json({ error: `Unknown project ${projectFilter}` }, 404);
 		const lists = await Promise.all(
@@ -63,7 +77,7 @@ export const createApp = (context: ServerContext): Hono => {
 				const adapter = context.adapters.get(project.id ?? project.name);
 				if (!adapter) return [];
 				const tickets = await adapter.list();
-				return tickets.map((ticket) => ({ ...ticket, project: project.name }));
+				return tickets.map((ticket) => ({ ...ticket, project: project.name, projectId: project.id }));
 			}),
 		);
 		const tickets = lists.flat().filter((ticket) => includeArchived || !ticket.archived);

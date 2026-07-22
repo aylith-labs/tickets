@@ -1,6 +1,12 @@
-import type { TicketWithProject } from '@aylith/tickets-core';
+import type { StoreLocation, TicketWithProject } from '@aylith/tickets-core';
 
 export type StatusColor = 'gray' | 'blue' | 'yellow' | 'green' | 'white';
+
+/** Compact one-line storage location, e.g. "git/central push · ~/.config/aylith-tickets/store/foo-1a2b". */
+export const locationLabel = (location: StoreLocation): string => {
+	const push = location.kind === 'git' ? (location.pushEnabled ? ' push' : ' local') : '';
+	return `${location.kind}/${location.scope}${push} · ${location.dataDir}`;
+};
 
 export const statusColor = (status: string): StatusColor => {
 	switch (status) {

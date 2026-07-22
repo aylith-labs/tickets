@@ -83,6 +83,24 @@
 		color: light-dark(#615b50, #b0a08a);
 		cursor: pointer;
 	}
+
+	.chip .scope {
+		margin-left: 0.3rem;
+		opacity: 0.65;
+	}
+
+	#project-info {
+		margin: -0.5rem 0 1.25rem;
+		font-size: 0.72rem;
+		line-height: 1.4;
+		color: light-dark(#8a8073, #7d7266);
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		overflow-wrap: anywhere;
+	}
+
+	#project-info .warn {
+		color: light-dark(#c0392b, #ff9d9d);
+	}
 </style>
 <div class="shell">
 	<header>
@@ -90,6 +108,7 @@
 		<nav id="projects" aria-label="Projects"></nav>
 		<button type="button" id="theme-toggle" aria-label="Theme"></button>
 	</header>
+	<p id="project-info" aria-live="polite"></p>
 	<main id="app"></main>
 </div>
 <script type="module" src="./main.js"></script>

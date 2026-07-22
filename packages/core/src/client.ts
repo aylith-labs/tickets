@@ -1,15 +1,27 @@
 import type { Attachment } from './types/Attachment';
+import type { StoreLocation } from './types/StoreLocation';
 import type { Ticket } from './types/Ticket';
 import type { TicketRevision } from './types/TicketRevision';
 
-export type TicketWithProject = Ticket & { project: string };
+export type TicketWithProject = Ticket & { project: string; projectId?: string };
+
+export type ProjectMeta = {
+	id?: string;
+	name: string;
+	repoPath: string;
+	adapter: string;
+	location: StoreLocation;
+	/** Set when the store can't be found; the UI surfaces it instead of dropping the project. */
+	unavailable?: string;
+};
 
 export type TicketsMeta = {
-	projects: Array<{ name: string; repoPath: string; adapter: string }>;
+	projects: ProjectMeta[];
 	statuses: string[];
 	terminals: Array<{ id: string; label: string }>;
 	enrichProviders: string[];
 	apiBase: string;
+	storeRoots: { store: string; worktrees: string };
 };
 
 const jsonInit = (method: string, body: unknown): RequestInit => ({

@@ -1,4 +1,4 @@
-export { TicketsClient, type TicketsMeta, type TicketWithProject } from './client';
+export { type ProjectMeta, TicketsClient, type TicketsMeta, type TicketWithProject } from './client';
 export { AyKebabMenu, type KebabItem } from './kebab-menu';
 export { AyStatusChip } from './status-chip';
 export { AyTicketCard } from './ticket-card';
