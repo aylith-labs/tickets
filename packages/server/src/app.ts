@@ -5,6 +5,7 @@ import { streamSSE } from 'hono/streaming';
 import type { ServerContext } from './context';
 import { runStatusChangeHook } from './hooks';
 import { buildLaunchCommand } from './launch';
+import { projectLocation } from './registry';
 import type { ProjectEntry } from './types/ProjectEntry';
 
 const isAllowedOrigin = (origin: string): boolean => {
@@ -27,15 +28,22 @@ export const createApp = (context: ServerContext): Hono => {
 	// *.lvh.me apps fetch the components module cross-origin (CORS-mode).
 	app.use('*', cors({ origin: (origin) => (isAllowedOrigin(origin) ? origin : undefined) }));
 
-	const resolveProject = (name: string): ResolvedProject | null => {
-		const project = context.config.projects.find((entry) => entry.name === name);
-		const adapter = context.adapters.get(name);
-		return project && adapter ? { project, adapter } : null;
+	const resolveProject = (key: string): ResolvedProject | null => {
+		const project =
+			context.config.projects.find((entry) => entry.id === key) ??
+			context.config.projects.find((entry) => entry.name === key);
+		if (!project) return null;
+		const adapter = context.adapters.get(project.id ?? project.name);
+		return adapter ? { project, adapter } : null;
 	};
 
 	app.get('/api/projects', (c) =>
 		c.json({
-			projects: context.config.projects.map(({ name, repoPath, adapter }) => ({ name, repoPath, adapter })),
+			projects: context.config.projects.map((project) => ({
+				name: project.name,
+				repoPath: project.repoPath,
+				adapter: projectLocation(project).kind,
+			})),
 			statuses: context.config.statuses,
 			terminals: context.config.terminals.map(({ id, label }) => ({ id, label })),
 			enrichProviders: context.config.enrich.providers.map(({ id }) => id),
@@ -51,11 +59,11 @@ export const createApp = (context: ServerContext): Hono => {
 			: context.config.projects;
 		if (projectFilter && projects.length === 0) return c.json({ error: `Unknown project ${projectFilter}` }, 404);
 		const lists = await Promise.all(
-			projects.map(async ({ name }) => {
-				const adapter = context.adapters.get(name);
+			projects.map(async (project) => {
+				const adapter = context.adapters.get(project.id ?? project.name);
 				if (!adapter) return [];
 				const tickets = await adapter.list();
-				return tickets.map((ticket) => ({ ...ticket, project: name }));
+				return tickets.map((ticket) => ({ ...ticket, project: project.name }));
 			}),
 		);
 		const tickets = lists.flat().filter((ticket) => includeArchived || !ticket.archived);

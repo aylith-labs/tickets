@@ -23,7 +23,7 @@ export type ServerContext = {
 export const createContext = (config: DaemonConfig, overrides: Partial<ServerContext> = {}): ServerContext => {
 	const adapters = new Map<string, StorageAdapter>();
 	for (const project of config.projects) {
-		adapters.set(project.name, createAdapter(project));
+		adapters.set(project.id ?? project.name, createAdapter(project));
 	}
 	return {
 		config,

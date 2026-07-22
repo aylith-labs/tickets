@@ -5,7 +5,8 @@ import { TICKETS_DIR } from '@aylith/tickets-core';
 import type { Hono } from 'hono';
 import { createApp } from './app';
 import { createContext, type ServerContext } from './context';
-import { readDaemonConfig } from './registry';
+import { reconcileProjects } from './reconcile';
+import { projectLocation, readDaemonConfig } from './registry';
 
 const WEB_DIST_DIR = fileURLToPath(new URL('../../../apps/web/dist', import.meta.url));
 
@@ -41,28 +42,39 @@ const registerStaticUi = (app: Hono, webAssets?: WebAssets): void => {
 
 const watchProjects = (context: ServerContext): void => {
 	for (const project of context.config.projects) {
+		const dataDir = projectLocation(project).dataDir;
 		let debounce: ReturnType<typeof setTimeout> | undefined;
 		try {
-			watch(join(project.dataDir, TICKETS_DIR), () => {
+			watch(join(dataDir, TICKETS_DIR), () => {
 				clearTimeout(debounce);
 				debounce = setTimeout(() => context.events.emit('tickets-updated'), 300);
 			});
 		} catch {
 			// The tickets/ dir may not exist until the first ticket — watch the data dir instead.
 			try {
-				watch(project.dataDir, () => {
+				watch(dataDir, () => {
 					clearTimeout(debounce);
 					debounce = setTimeout(() => context.events.emit('tickets-updated'), 300);
 				});
 			} catch (error) {
-				console.warn(`tickets: cannot watch ${project.dataDir}:`, error instanceof Error ? error.message : error);
+				console.warn(`tickets: cannot watch ${dataDir}:`, error instanceof Error ? error.message : error);
 			}
 		}
 	}
 };
 
 export const startDaemon = async (options: { configPath?: string; port?: number; webAssets?: WebAssets } = {}) => {
-	const config = await readDaemonConfig(options.configPath);
+	const initialConfig = await readDaemonConfig(options.configPath);
+	const { config, diagnostics } = await reconcileProjects(initialConfig, {
+		persist: true,
+		configPath: options.configPath,
+	});
+	for (const diagnostic of diagnostics) {
+		if (diagnostic.kind === 'store-missing')
+			console.warn(`tickets: project "${diagnostic.name}" — ${diagnostic.reason}`);
+		else if (diagnostic.kind === 'adoptable')
+			console.warn(`tickets: unregistered store at ${diagnostic.path} (run: tickets adopt ${diagnostic.path})`);
+	}
 	if (options.port) config.port = options.port;
 	const context = createContext(config);
 	watchProjects(context);

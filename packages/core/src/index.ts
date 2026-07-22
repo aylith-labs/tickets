@@ -11,6 +11,7 @@ export type { AttachmentKind } from './types/AttachmentKind';
 export type { AttachmentType } from './types/AttachmentType';
 export type { PromptProject } from './types/PromptProject';
 export type { StorageAdapter } from './types/StorageAdapter';
+export type { StoreLocation, StoreScope } from './types/StoreLocation';
 export type { Ticket } from './types/Ticket';
 export type { TicketCreateInput } from './types/TicketCreateInput';
 export type { TicketPatch } from './types/TicketPatch';

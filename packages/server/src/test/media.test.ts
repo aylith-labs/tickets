@@ -91,6 +91,8 @@ describe('POST /api/tickets/:project/:id/attachments', () => {
 		port: 0,
 		apiBase: 'https://tickets.lvh.me/api',
 		statuses: [...DEFAULT_STATUSES],
+		storeRoot: dataDir,
+		worktreesRoot: dataDir,
 		projects: [{ name: 'demo', repoPath: '/tmp/repos/demo', adapter: 'folder', dataDir }],
 		terminals: DEFAULT_TERMINALS,
 		enrich: { defaultProvider: 'claude-cli', providers: [{ id: 'claude-cli', kind: 'claude-cli' }] },

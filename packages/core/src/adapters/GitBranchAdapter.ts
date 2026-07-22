@@ -16,6 +16,9 @@ export type GitBranchAdapterOptions = FolderAdapterOptions & {
 export class GitBranchAdapter extends FolderAdapter {
 	private readonly pushEnabled: boolean;
 	private pushChain: Promise<void> = Promise.resolve();
+	/** Serializes index-mutating git work per repository root, across all instances. */
+	private static readonly gitQueues = new Map<string, Promise<unknown>>();
+	private rootCache?: Promise<string>;
 
 	constructor(options: GitBranchAdapterOptions) {
 		super(options);
@@ -26,10 +29,35 @@ export class GitBranchAdapter extends FolderAdapter {
 		return exec('git', args, this.dataDir);
 	}
 
+	/** Absolute git top-level of this store — the serialization key (cached). */
+	private gitRoot(): Promise<string> {
+		this.rootCache ??= this.git(['rev-parse', '--show-toplevel']).then(({ stdout }) => stdout.trim());
+		return this.rootCache;
+	}
+
+	/**
+	 * Runs `task` after any prior git work on the same repo root has settled.
+	 * Central stores put many project subfolders in one repo, so their commits
+	 * and pushes share a single `.git/index` and must not overlap. Per-repo
+	 * worktrees resolve to distinct roots and keep full parallelism.
+	 */
+	private async withGitLock<Result>(task: () => Promise<Result>): Promise<Result> {
+		const root = await this.gitRoot();
+		const prior = GitBranchAdapter.gitQueues.get(root) ?? Promise.resolve();
+		const run = prior.then(task, task);
+		GitBranchAdapter.gitQueues.set(
+			root,
+			run.catch(() => undefined),
+		);
+		return run;
+	}
+
 	async getRevisions(id: string): Promise<TicketRevision[]> {
 		const relativePath = this.ticketRelativePath(id);
 		try {
-			const { stdout } = await this.git(['log', '--follow', '--format=%H%x09%aI%x09%s', '--', relativePath]);
+			// No `--follow`: ticket files are never renamed, and in a central store
+			// its rename detection would leak a sibling project's same-id history.
+			const { stdout } = await this.git(['log', '--format=%H%x09%aI%x09%s', '--', relativePath]);
 			return stdout
 				.split('\n')
 				.filter((line) => line.length > 0)
@@ -67,20 +95,24 @@ export class GitBranchAdapter extends FolderAdapter {
 	protected override async persist(ticket: Ticket, message: string): Promise<void> {
 		await super.persist(ticket, message);
 		const relativePath = this.ticketRelativePath(ticket.id);
-		await this.git(['add', '--', relativePath]);
-		try {
-			await this.git(['commit', '--no-verify', '-m', message, '--', relativePath]);
-		} catch (error) {
-			// A patch that results in identical content has nothing to commit — not an error.
-			const text = error instanceof Error ? error.message : String(error);
-			if (!text.includes('nothing to commit') && !text.includes('nothing added to commit')) throw error;
-		}
+		// The file write above is subfolder-scoped and collision-free; only the
+		// shared-index add+commit needs the per-root lock.
+		await this.withGitLock(async () => {
+			await this.git(['add', '--', relativePath]);
+			try {
+				await this.git(['commit', '--no-verify', '-m', message, '--', relativePath]);
+			} catch (error) {
+				// A patch that results in identical content has nothing to commit — not an error.
+				const text = error instanceof Error ? error.message : String(error);
+				if (!text.includes('nothing to commit') && !text.includes('nothing added to commit')) throw error;
+			}
+		});
 		if (this.pushEnabled) this.schedulePush();
 	}
 
-	/** Serialized best-effort push; failures are logged, never thrown. */
+	/** Best-effort push routed through the per-root lock; failures are logged, never thrown. */
 	private schedulePush(): void {
-		this.pushChain = this.pushChain.then(async () => {
+		this.pushChain = this.withGitLock(async () => {
 			try {
 				const { stdout } = await this.git(['rev-parse', '--abbrev-ref', 'HEAD']);
 				const branch = stdout.trim();
@@ -91,8 +123,9 @@ export class GitBranchAdapter extends FolderAdapter {
 		});
 	}
 
-	/** Await any queued pushes (used by tests and graceful shutdown). */
+	/** Await any queued work on this store's repo root (used by tests and graceful shutdown). */
 	async flush(): Promise<void> {
 		await this.pushChain;
+		await (GitBranchAdapter.gitQueues.get(await this.gitRoot()) ?? Promise.resolve());
 	}
 }

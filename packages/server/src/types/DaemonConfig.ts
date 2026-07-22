@@ -8,6 +8,10 @@ export type DaemonConfig = {
 	/** Public API base used in composed prompts and $PROMPT_URL, e.g. https://tickets.lvh.me/api */
 	apiBase: string;
 	statuses: string[];
+	/** Root for central stores. Default ~/.config/aylith-tickets/store */
+	storeRoot: string;
+	/** Root for relocated per-repo git worktrees. Default ~/.config/aylith-tickets/worktrees */
+	worktreesRoot: string;
 	projects: ProjectEntry[];
 	terminals: TerminalConfig[];
 	enrich: {

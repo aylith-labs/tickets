@@ -120,4 +120,20 @@ describe('GitBranchAdapter', () => {
 		await adapter.create({ title: 'Push me' });
 		await adapter.flush(); // must not throw even though there is no origin
 	});
+
+	test('concurrent commits across subfolders of one repo do not race the index', async () => {
+		await exec('git', ['init', '-b', 'main'], dataDir);
+		await exec('git', ['config', 'user.email', 'tickets@test.local'], dataDir);
+		await exec('git', ['config', 'user.name', 'Tickets Test'], dataDir);
+		const alpha = new GitBranchAdapter({ dataDir: join(dataDir, 'alpha'), push: false });
+		const beta = new GitBranchAdapter({ dataDir: join(dataDir, 'beta'), push: false });
+
+		const [first, second] = await Promise.all([alpha.create({ title: 'Alpha' }), beta.create({ title: 'Beta' })]);
+		await Promise.all([alpha.flush(), beta.flush()]);
+
+		expect((await alpha.getRevisions(first.id)).length).toBe(1);
+		expect((await beta.getRevisions(second.id)).length).toBe(1);
+		const { stdout } = await exec('git', ['log', '--format=%s'], dataDir);
+		expect(stdout.split('\n').filter((line) => line === 'Create ticket 0001').length).toBe(2);
+	});
 });

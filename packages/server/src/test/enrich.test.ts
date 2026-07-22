@@ -59,6 +59,8 @@ describe('POST /api/tickets/:project/:id/enrich', () => {
 		port: 0,
 		apiBase: 'https://tickets.lvh.me/api',
 		statuses: [...DEFAULT_STATUSES],
+		storeRoot: dataDir,
+		worktreesRoot: dataDir,
 		projects: [{ name: 'demo', repoPath: '/tmp/repos/demo', adapter: 'git', dataDir }],
 		terminals: DEFAULT_TERMINALS,
 		enrich: {
