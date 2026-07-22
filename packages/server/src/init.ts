@@ -71,7 +71,7 @@ const ensureCentralRepo = async (storeRoot: string, remote?: string): Promise<vo
 	await ensureGitIdentity(storeRoot);
 };
 
-type ProvisionInput = {
+export type ProvisionInput = {
 	setup: StoreSetup;
 	repoPath: string;
 	storeRoot: string;
@@ -81,7 +81,7 @@ type ProvisionInput = {
 };
 
 /** Creates the on-disk store for a setup (if missing) and returns its location. */
-const provisionStore = async (input: ProvisionInput): Promise<StoreLocation> => {
+export const provisionStore = async (input: ProvisionInput): Promise<StoreLocation> => {
 	const { setup, repoPath, storeRoot, worktreesRoot, subdir, remote } = input;
 	if (setup === 'repo-folder') {
 		const dataDir = join(repoPath, '.tickets');

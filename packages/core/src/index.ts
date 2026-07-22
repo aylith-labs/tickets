@@ -5,6 +5,7 @@ export { DEFAULT_STATUS, DEFAULT_STATUSES, ID_PAD_WIDTH, TICKETS_DIR } from './c
 export { type ExecResult, exec } from './exec';
 export { nextTicketId } from './id';
 export { parseTicket, serializeTicket } from './markdown';
+export { type MigrateResult, migrateTickets } from './migrate';
 export { composePrompt, DEFAULT_PROMPT_TEMPLATE, type PromptOptions } from './prompt';
 export type { Attachment } from './types/Attachment';
 export type { AttachmentKind } from './types/AttachmentKind';
