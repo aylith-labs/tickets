@@ -84,6 +84,17 @@ export const migrateProject = async (options: MigrateOptions): Promise<MigrateOu
 		await mkdir(dirname(newDataDir), { recursive: true });
 		await exec('git', ['worktree', 'move', from.dataDir, newDataDir], entry.repoPath);
 		const to: StoreLocation = { ...from, dataDir: newDataDir };
+		// A committed marker moves with the worktree; only a legacy store lacks one.
+		if (!(await readMarker(newDataDir))) {
+			await writeAndCommitMarker(newDataDir, {
+				schemaVersion: 1,
+				id,
+				name: entry.name,
+				kind: to.kind,
+				repoRemote: to.remote,
+				createdAt: new Date().toISOString(),
+			});
+		}
 		entry.id = id;
 		entry.location = to;
 		delete entry.unavailable;
