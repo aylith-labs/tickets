@@ -35,19 +35,36 @@ make serve-bg       # run the daemon in the background (tickets.lvh.me)
 ## Architecture
 
 - `packages/core` (`@aylith/tickets-core`) — ticket types, markdown ticket format
-  (frontmatter + body), storage adapters (`GitBranchAdapter` = orphan `tickets`
-  branch worktree, `FolderAdapter` = plain folder), prompt composer, and the
-  isomorphic `TicketsClient` (exposed at the `./client` subpath so browser bundles
-  never pull the Node-only adapters).
+  (frontmatter + body), storage adapters (`GitBranchAdapter`, `FolderAdapter`), the
+  `StoreLocation` descriptor, `migrateTickets`, prompt composer, and the isomorphic
+  `TicketsClient` (exposed at the `./client` subpath so browser bundles never pull the
+  Node-only adapters).
 - `packages/server` (`@aylith/tickets-server`) — Hono daemon + `tickets` CLI
-  (`init`/`serve`/`tui`/`list`). REST + SSE, terminal launch, AI enrich (claude-cli
-  / Anthropic / OpenAI-compatible), media pipeline. `cli.ts` (npm, on-disk web) and
-  `binary.ts` (`bun --compile`, embeds `apps/web/dist`) both call the shared `runCli`.
+  (`init`/`serve`/`tui`/`list`/`migrate`/`converge`/`rename`). REST + SSE, terminal
+  launch, AI enrich (claude-cli / Anthropic / OpenAI-compatible), media pipeline.
+  `cli.ts` (npm, on-disk web) and `binary.ts` (`bun --compile`, embeds `apps/web/dist`)
+  both call the shared `runCli`.
 - `packages/ui` (`@aylith/tickets-ui`) — Lit web components, themed via `--ay-*` CSS
   custom properties.
 - `packages/tui` (`@aylith/tickets-tui`) — Ink terminal UI across all projects.
 - `apps/web` — the central UI served by the daemon.
-- Ticket **data** lives on each consuming repo's orphan `tickets` branch, never here.
+
+### Storage topology (`StoreLocation`)
+
+- A project's tickets live wherever its `StoreLocation` points, and the daemon
+  aggregates across all of them. Setups coexist: **per-repo** (`repo-git` = orphan
+  `tickets` branch worktree under `~/.config/aylith-tickets/worktrees/`; `repo-folder`
+  = `<repo>/.tickets`) and **central** (`central-git` = one shared repo, or
+  `central-folder`, under `~/.config/aylith-tickets/store/`). `tickets init --into <setup>`
+  picks one; `migrate`/`converge` move between them; `rename` never moves data.
+- Config lives at `~/.config/aylith-tickets/config.json`. Each store is
+  **self-describing**: a committed `.tickets-store.json` marker carries a stable,
+  immutable project `id`. `name`/`repoPath` are mutable metadata; adapters and routes
+  key by `id ?? name`, so renames/moves never orphan or duplicate data.
+  `reconcileProjects` heals the config against disk on daemon startup (mints ids for
+  legacy entries, re-finds moved stores by id, repairs worktrees, surfaces missing
+  stores). Central-git shares one repo across projects — `GitBranchAdapter` serializes
+  index-mutating git work per repo root.
 
 ## Conventions
 
