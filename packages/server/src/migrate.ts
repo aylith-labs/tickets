@@ -1,13 +1,19 @@
-import { mkdir, rm } from 'node:fs/promises';
+import { access, mkdir, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { exec, migrateTickets, type StoreLocation } from '@aylith/tickets-core';
 import { generateProjectId, projectSubdir } from './identity';
-import { provisionStore } from './init';
+import { branchExists, DATA_BRANCH, provisionStore, remoteBranchExists } from './init';
 import { projectLocation, readDaemonConfig, writeDaemonConfig } from './registry';
 import { readMarker, writeAndCommitMarker } from './store-marker';
 import type { DaemonConfig } from './types/DaemonConfig';
 import type { ProjectEntry } from './types/ProjectEntry';
 import type { StoreSetup } from './types/StoreSetup';
+
+const pathExists = (path: string): Promise<boolean> =>
+	access(path).then(
+		() => true,
+		() => false,
+	);
 
 export type MigrateOptions = {
 	selector: string;
@@ -77,12 +83,24 @@ export const migrateProject = async (options: MigrateOptions): Promise<MigrateOu
 
 	// Relocate a per-repo git worktree in place — no ticket copy, keep the branch.
 	if (from.kind === 'git' && from.scope === 'repo' && options.to === 'repo-git') {
+		const branch = from.branch ?? DATA_BRANCH;
 		const newDataDir = join(worktreesRoot, subdir);
-		if (newDataDir === from.dataDir) {
+		const sourcePresent = await pathExists(join(from.dataDir, '.git'));
+		if (newDataDir === from.dataDir && sourcePresent) {
 			return { name: entry.name, from, to: from, copied: 0, moved: false, unchanged: true, cleaned: false };
 		}
 		await mkdir(dirname(newDataDir), { recursive: true });
-		await exec('git', ['worktree', 'move', from.dataDir, newDataDir], entry.repoPath);
+		if (sourcePresent) {
+			await exec('git', ['worktree', 'move', from.dataDir, newDataDir], entry.repoPath);
+		} else if (await branchExists(entry.repoPath, branch)) {
+			// Worktree gone but the local branch remains — re-attach it at the new location.
+			await exec('git', ['worktree', 'add', newDataDir, branch], entry.repoPath);
+		} else if (await remoteBranchExists(entry.repoPath, branch)) {
+			// Worktree and local branch gone but the data is on origin — recreate it.
+			await exec('git', ['worktree', 'add', '--track', '-b', branch, newDataDir, `origin/${branch}`], entry.repoPath);
+		} else {
+			throw new Error(`Cannot relocate ${entry.name}: worktree missing at ${from.dataDir} and no origin/${branch}`);
+		}
 		const to: StoreLocation = { ...from, dataDir: newDataDir };
 		// A committed marker moves with the worktree; only a legacy store lacks one.
 		if (!(await readMarker(newDataDir))) {
@@ -177,5 +195,41 @@ export const renameProject = async (selector: string, newName: string, configPat
 	const marker = await readMarker(location.dataDir);
 	if (marker) await writeAndCommitMarker(location.dataDir, { ...marker, name: newName });
 	await writeDaemonConfig(config, configPath);
+	return entry;
+};
+
+/** Registers an on-disk store (one reconcile surfaced as adoptable) back into the config. */
+export const adoptStore = async (dataDir: string, options: { configPath?: string } = {}): Promise<ProjectEntry> => {
+	const marker = await readMarker(dataDir);
+	if (!marker) throw new Error(`No .tickets-store.json marker at ${dataDir}`);
+	const config = await readDaemonConfig(options.configPath);
+	const existing = config.projects.find((project) => project.id === marker.id);
+	if (existing) throw new Error(`Project ${marker.id} ("${existing.name}") is already registered`);
+
+	const scope = dataDir.startsWith(config.storeRoot) ? 'central' : 'repo';
+	let repoPath: string;
+	let location: StoreLocation;
+	if (marker.kind === 'git') {
+		// --git-common-dir points at the owning repo's .git (the consuming repo for a
+		// worktree, the store repo for a central subfolder).
+		const commonDir = await exec('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], dataDir).then(
+			({ stdout }) => stdout.trim(),
+		);
+		repoPath = dirname(commonDir);
+		const branch = await exec('git', ['symbolic-ref', '--short', 'HEAD'], dataDir)
+			.then(({ stdout }) => stdout.trim() || DATA_BRANCH)
+			.catch(() => DATA_BRANCH);
+		const remote = await exec('git', ['remote', 'get-url', 'origin'], dataDir)
+			.then(({ stdout }) => stdout.trim() || undefined)
+			.catch(() => undefined);
+		location = { kind: 'git', scope, dataDir, branch, remote, pushEnabled: scope === 'repo' || Boolean(remote) };
+	} else {
+		repoPath = dirname(dataDir);
+		location = { kind: 'folder', scope, dataDir };
+	}
+
+	const entry: ProjectEntry = { id: marker.id, name: marker.name, repoPath, location };
+	config.projects.push(entry);
+	await writeDaemonConfig(config, options.configPath);
 	return entry;
 };

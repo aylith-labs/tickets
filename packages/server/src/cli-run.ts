@@ -1,5 +1,6 @@
+import { resolve } from 'node:path';
 import { initProject } from './init';
-import { convergeProjects, type MigrateOutcome, migrateProject, renameProject } from './migrate';
+import { adoptStore, convergeProjects, type MigrateOutcome, migrateProject, renameProject } from './migrate';
 import { projectLocation, readDaemonConfig } from './registry';
 import type { WebAssets } from './serve';
 import { startDaemon } from './serve';
@@ -22,6 +23,7 @@ Usage:
   tickets converge [--adapter git|folder] [--remote <url>] [--cleanup]
                                                          Move every per-repo project into the central store
   tickets rename <project|id> <new-name>                 Rename a project (data stays put)
+  tickets adopt <store-path>                             Re-register an on-disk store from its marker
   tickets help
 
 Setups (--into / --to): repo-git (default), repo-folder, central-git, central-folder
@@ -139,6 +141,17 @@ export const runCli = async (argv: string[], options: { webAssets?: WebAssets } 
 			}
 			const entry = await renameProject(selector, newName);
 			console.log(`Renamed to "${entry.name}"`);
+			return;
+		}
+		case 'adopt': {
+			const storePath = rest[0];
+			if (!storePath || storePath.startsWith('--')) {
+				console.error('Usage: tickets adopt <store-path>');
+				process.exit(1);
+			}
+			const entry = await adoptStore(resolve(storePath));
+			const location = projectLocation(entry);
+			console.log(`Adopted "${entry.name}" (${location.kind}/${location.scope})\n  data:  ${location.dataDir}`);
 			return;
 		}
 		case 'list': {

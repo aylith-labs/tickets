@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { exec } from '@aylith/tickets-core';
 import { initProject } from '../init';
-import { convergeProjects, migrateProject, renameProject } from '../migrate';
-import { createAdapter, readDaemonConfig } from '../registry';
+import { adoptStore, convergeProjects, migrateProject, renameProject } from '../migrate';
+import { createAdapter, readDaemonConfig, writeDaemonConfig } from '../registry';
 import { readMarker } from '../store-marker';
 
 let rootDir: string;
@@ -109,5 +109,68 @@ describe('migrate + converge + rename', () => {
 		expect((await readMarker(entry.location?.dataDir ?? ''))?.name).toBe('delta-renamed');
 		const config = await readDaemonConfig(configPath);
 		expect(config.projects.find((project) => project.id === entry.id)?.name).toBe('delta-renamed');
+	});
+
+	test('adopt re-registers an on-disk store from its marker', async () => {
+		const repo = await makeRepo('epsilon');
+		const entry = await initProject({
+			cwd: repo,
+			name: 'epsilon',
+			into: 'repo-git',
+			configPath,
+			storeRoot,
+			worktreesRoot,
+		});
+		const dataDir = entry.location?.dataDir ?? '';
+
+		// Drop it from config, leaving the store (and its marker) on disk.
+		const config = await readDaemonConfig(configPath);
+		await writeDaemonConfig(
+			{ ...config, projects: config.projects.filter((project) => project.id !== entry.id) },
+			configPath,
+		);
+
+		const adopted = await adoptStore(dataDir, { configPath });
+		expect(adopted.id).toBe(entry.id);
+		expect(adopted.name).toBe('epsilon');
+		expect(adopted.location?.scope).toBe('repo');
+		const after = await readDaemonConfig(configPath);
+		expect(after.projects.some((project) => project.id === entry.id)).toBe(true);
+	});
+
+	test('migrate recovers a worktree from origin when the local branch is gone', async () => {
+		const remote = join(rootDir, 'remote.git');
+		await exec('git', ['init', '--bare', '-b', 'main', remote], rootDir);
+		const repo = await makeRepo('zeta');
+		await exec('git', ['remote', 'add', 'origin', remote], repo);
+		const worktreesA = join(rootDir, 'wtA');
+		const entry = await initProject({
+			cwd: repo,
+			name: 'zeta',
+			into: 'repo-git',
+			configPath,
+			storeRoot,
+			worktreesRoot: worktreesA,
+		});
+		const oldDir = entry.location?.dataDir ?? '';
+
+		// Push the data, then destroy both the worktree and the local branch — only origin/tickets survives.
+		await exec('git', ['push', 'origin', 'tickets'], oldDir);
+		await exec('git', ['worktree', 'remove', '--force', oldDir], repo);
+		await exec('git', ['branch', '-D', 'tickets'], repo);
+		expect(await exists(oldDir)).toBe(false);
+
+		const worktreesB = join(rootDir, 'wtB');
+		const outcome = await migrateProject({
+			selector: 'zeta',
+			to: 'repo-git',
+			configPath,
+			storeRoot,
+			worktreesRoot: worktreesB,
+		});
+		expect(outcome.to.dataDir.startsWith(worktreesB)).toBe(true);
+		await access(join(outcome.to.dataDir, '.git'));
+		const { stdout } = await exec('git', ['rev-parse', '--abbrev-ref', 'HEAD'], outcome.to.dataDir);
+		expect(stdout.trim()).toBe('tickets');
 	});
 });

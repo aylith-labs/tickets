@@ -81,6 +81,38 @@ describe('initProject', () => {
 		expect(entry.location?.dataDir).toBe(join(repoPath, '.tickets'));
 	});
 
+	test('repo-git checks out an existing origin/tickets instead of orphaning over it', async () => {
+		// A bare remote whose `tickets` branch already holds a ticket.
+		const remote = join(rootDir, 'remote.git');
+		await exec('git', ['init', '--bare', '-b', 'main', remote], rootDir);
+		const seed = join(rootDir, 'seed');
+		await mkdir(seed, { recursive: true });
+		await exec('git', ['init', '-b', 'main', seed], rootDir);
+		await exec('git', ['config', 'user.email', 't@t'], seed);
+		await exec('git', ['config', 'user.name', 't'], seed);
+		await exec('git', ['checkout', '--orphan', 'tickets'], seed);
+		await mkdir(join(seed, 'tickets'), { recursive: true });
+		await writeFile(
+			join(seed, 'tickets', '0001.md'),
+			'---\nid: "0001"\ntitle: Seeded\nstatus: todo\n---\nFrom origin.\n',
+			'utf8',
+		);
+		await exec('git', ['add', '.'], seed);
+		await exec('git', ['commit', '--no-verify', '-m', 'seed ticket'], seed);
+		await exec('git', ['remote', 'add', 'origin', remote], seed);
+		await exec('git', ['push', 'origin', 'tickets'], seed);
+
+		// The target repo gets that remote but has no local tickets branch.
+		await exec('git', ['remote', 'add', 'origin', remote], repoPath);
+
+		const entry = await init();
+		const dataDir = entry.location?.dataDir ?? '';
+		const { stdout: branch } = await exec('git', ['rev-parse', '--abbrev-ref', 'HEAD'], dataDir);
+		expect(branch.trim()).toBe('tickets');
+		// The seeded ticket came across — not an empty orphan.
+		await access(join(dataDir, 'tickets', '0001.md'));
+	});
+
 	test('central-git puts the project in one shared store repo', async () => {
 		const entry = await init({ into: 'central-git' });
 		expect(entry.location?.kind).toBe('git');

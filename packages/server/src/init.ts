@@ -34,13 +34,21 @@ const pathExists = async (path: string): Promise<boolean> => {
 	}
 };
 
-const branchExists = async (repoPath: string, branch: string): Promise<boolean> => {
+export const branchExists = async (repoPath: string, branch: string): Promise<boolean> => {
 	try {
 		await exec('git', ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], repoPath);
 		return true;
 	} catch {
 		return false;
 	}
+};
+
+/** True when `origin/<branch>` holds data (fetches first so a fresh clone sees it). */
+export const remoteBranchExists = async (repoPath: string, branch: string): Promise<boolean> => {
+	await exec('git', ['fetch', 'origin', branch], repoPath).catch(() => undefined);
+	return exec('git', ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`], repoPath)
+		.then(() => true)
+		.catch(() => false);
 };
 
 const gitRemote = async (dir: string): Promise<string | undefined> =>
@@ -113,6 +121,9 @@ export const provisionStore = async (input: ProvisionInput): Promise<StoreLocati
 		await mkdir(worktreesRoot, { recursive: true });
 		if (await branchExists(repoPath, DATA_BRANCH)) {
 			await exec('git', ['worktree', 'add', dataDir, DATA_BRANCH], repoPath);
+		} else if (await remoteBranchExists(repoPath, DATA_BRANCH)) {
+			// Reclone: the data branch already exists on origin — check it out, never orphan over it.
+			await exec('git', ['worktree', 'add', '--track', '-b', DATA_BRANCH, dataDir, `origin/${DATA_BRANCH}`], repoPath);
 		} else {
 			await exec('git', ['worktree', 'add', '--orphan', '-b', DATA_BRANCH, dataDir], repoPath);
 			await exec('git', ['commit', '--allow-empty', '--no-verify', '-m', 'Initialize tickets data branch'], dataDir);
