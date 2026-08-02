@@ -11,7 +11,7 @@ prompt, open a terminal (Windows Terminal, Tabby, …) already running
 |---|---|
 | [`@aylith/tickets`](https://www.npmjs.com/package/@aylith/tickets) | **Everything in one** — both CLIs (`tickets`, `tickets-tui`) plus the libraries below re-exported as subpaths (`.` = core, `/client`, `/ui`, `/server`) |
 | [`@aylith/tickets-core`](https://www.npmjs.com/package/@aylith/tickets-core) | Types, markdown ticket format, storage adapters (git data branch / plain folder), prompt composer |
-| [`@aylith/tickets-server`](https://www.npmjs.com/package/@aylith/tickets-server) | `tickets` CLI (`init`, `serve`, `tui`) — Hono daemon: REST API, SSE, terminal launch, AI enrich, media pipeline |
+| [`@aylith/tickets-server`](https://www.npmjs.com/package/@aylith/tickets-server) | `tickets` CLI (`init`, `serve`, `tui`, `list`, `migrate`, `converge`, `rename`, `adopt`) — Hono daemon: REST API, SSE, terminal launch, AI enrich, media pipeline |
 | [`@aylith/tickets-ui`](https://www.npmjs.com/package/@aylith/tickets-ui) | Framework-agnostic Lit web components (`<ay-ticket-list>`, `<ay-ticket-card>`, …), themeable via CSS custom properties |
 | [`@aylith/tickets-tui`](https://www.npmjs.com/package/@aylith/tickets-tui) | Terminal UI (`tickets-tui` / `tickets tui`) — browse and act on tickets across all projects, Ink + React |
 | `apps/web` | Central UI served by the daemon — all projects at `/`, per-project at `/<project>` |
@@ -38,11 +38,19 @@ GitHub release (auth via the `NPM_TOKEN` repo secret).
 
 ## How data is stored
 
-Default adapter keeps tickets as markdown files (`tickets/<id>.md`, YAML
-frontmatter + body) on a dedicated orphan `tickets` branch of the project's own
-repo, checked out as a worktree at `<repo>.worktrees/tickets`. Every mutation is
-one commit — title/description history and undo come from git, not a bespoke
-store. A plain-folder adapter (no git) is available per project.
+Tickets are markdown files (`tickets/<id>.md`, YAML frontmatter + body). The
+default setup keeps them on a dedicated orphan `tickets` branch of the project's
+own repo, checked out as a worktree under `~/.config/aylith-tickets/worktrees/`.
+Every mutation is one commit — title/description history and undo come from git,
+not a bespoke store.
+
+Each project points at its store through a `StoreLocation`, and the setups
+coexist: `repo-git` (the default above), `repo-folder` (`<repo>/.tickets`),
+`central-git` (one shared repo) and `central-folder`, both under
+`~/.config/aylith-tickets/store/`. Pick one at `tickets init --into <setup>`;
+`migrate` and `converge` move a project between them, and `rename` never moves
+data. Every store is self-describing — a committed `.tickets-store.json` marker
+carries a stable id — so renames, moves and reclones never orphan the data.
 
 ## Install
 
