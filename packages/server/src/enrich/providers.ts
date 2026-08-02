@@ -11,6 +11,8 @@ const execFileAsync = promisify(execFile);
 
 const ENRICH_TIMEOUT_MS = 180_000;
 
+const DEFAULT_ANTHROPIC_MODEL = 'claude-opus-5';
+
 const resolveApiKey = (config: EnrichProviderConfig): string | undefined =>
 	config.apiKeyEnv ? process.env[config.apiKeyEnv] : undefined;
 
@@ -23,13 +25,20 @@ const enrichWithClaudeCli = async (prompt: string, config: EnrichProviderConfig)
 };
 
 const enrichWithAnthropic = async (prompt: string, config: EnrichProviderConfig): Promise<EnrichResult | null> => {
-	const client = new Anthropic({ apiKey: resolveApiKey(config) });
+	const client = new Anthropic({ apiKey: resolveApiKey(config), timeout: ENRICH_TIMEOUT_MS });
 	const response = await client.messages.create({
-		model: config.model ?? 'claude-opus-4-8',
-		max_tokens: 16000,
-		output_config: { format: { type: 'json_schema', schema: ENRICH_SCHEMA } },
+		model: config.model ?? DEFAULT_ANTHROPIC_MODEL,
+		// max_tokens caps thinking and response text together; leave headroom above
+		// the schema-shaped answer so a thinking turn can't truncate it.
+		max_tokens: 32000,
+		thinking: { type: 'adaptive' },
+		output_config: { effort: 'low', format: { type: 'json_schema', schema: ENRICH_SCHEMA } },
 		messages: [{ role: 'user', content: prompt }],
 	});
+	if (response.stop_reason === 'refusal') {
+		const category = response.stop_details?.category;
+		throw new Error(`Provider ${config.id} declined the request${category ? ` (${category})` : ''}`);
+	}
 	const textBlock = response.content.find((block) => block.type === 'text');
 	return textBlock ? extractEnrichResult(textBlock.text) : null;
 };
