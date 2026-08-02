@@ -41,6 +41,28 @@ describe('FolderAdapter', () => {
 		expect(fetched?.description).toBe('Do the thing.');
 	});
 
+	test('concurrent creates get distinct ids and none is lost', async () => {
+		const adapter = new FolderAdapter({ dataDir });
+		const titles = Array.from({ length: 12 }, (_, index) => `Ticket ${index}`);
+		const created = await Promise.all(titles.map((title) => adapter.create({ title })));
+
+		const ids = created.map((ticket) => ticket.id);
+		expect(new Set(ids).size).toBe(titles.length);
+
+		const listed = await adapter.list();
+		expect(listed).toHaveLength(titles.length);
+		expect(listed.map((ticket) => ticket.title).sort()).toEqual([...titles].sort());
+	});
+
+	test('a second adapter on the same store does not reuse an id', async () => {
+		const first = new FolderAdapter({ dataDir });
+		const second = new FolderAdapter({ dataDir });
+		const [left, right] = await Promise.all([first.create({ title: 'Left' }), second.create({ title: 'Right' })]);
+
+		expect(left.id).not.toBe(right.id);
+		expect(await first.list()).toHaveLength(2);
+	});
+
 	test('has no revisions', async () => {
 		const adapter = new FolderAdapter({ dataDir });
 		await adapter.create({ title: 'One' });

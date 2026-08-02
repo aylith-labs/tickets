@@ -1,4 +1,4 @@
-export { FolderAdapter, type FolderAdapterOptions } from './adapters/FolderAdapter';
+export { FolderAdapter, type FolderAdapterOptions, type PersistOptions } from './adapters/FolderAdapter';
 export { GitBranchAdapter, type GitBranchAdapterOptions } from './adapters/GitBranchAdapter';
 export { type ProjectMeta, TicketsClient, type TicketsMeta, type TicketWithProject } from './client';
 export { DEFAULT_STATUS, DEFAULT_STATUSES, ID_PAD_WIDTH, TICKETS_DIR } from './constants';

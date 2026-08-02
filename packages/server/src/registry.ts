@@ -73,18 +73,33 @@ const withDefaults = (partial: Partial<DaemonConfig>): DaemonConfig => ({
 	onStatusChange: partial.onStatusChange,
 });
 
+/**
+ * A missing config is the first-run case and yields defaults. A config that
+ * exists but cannot be parsed is an error: silently substituting defaults would
+ * present every registered project as gone and invite re-registering over it.
+ */
 export const readDaemonConfig = async (configPath: string = CONFIG_PATH): Promise<DaemonConfig> => {
+	let raw: string;
 	try {
-		const raw = await readFile(configPath, 'utf8');
+		raw = await readFile(configPath, 'utf8');
+	} catch (error) {
+		if (typeof error === 'object' && error !== null && (error as { code?: string }).code === 'ENOENT') {
+			return withDefaults({});
+		}
+		throw new Error(`Cannot read ${configPath}: ${error instanceof Error ? error.message : String(error)}`);
+	}
+	try {
 		return withDefaults(JSON.parse(raw) as Partial<DaemonConfig>);
-	} catch {
-		return withDefaults({});
+	} catch (error) {
+		throw new Error(`${configPath} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
 	}
 };
 
 export const writeDaemonConfig = async (config: DaemonConfig, configPath: string = CONFIG_PATH): Promise<void> => {
 	await mkdir(dirname(configPath), { recursive: true });
-	const tmpPath = `${configPath}.tmp-${process.pid}`;
+	// Per-write suffix: two writes racing in one process would otherwise share a
+	// scratch path and rename each other's half-written file into place.
+	const tmpPath = `${configPath}.tmp-${process.pid}-${crypto.randomUUID().slice(0, 8)}`;
 	await writeFile(tmpPath, `${JSON.stringify(config, null, '\t')}\n`, 'utf8');
 	await rename(tmpPath, configPath);
 };

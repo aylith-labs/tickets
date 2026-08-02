@@ -2,7 +2,7 @@ import { exec } from '../exec';
 import { parseTicket } from '../markdown';
 import type { Ticket } from '../types/Ticket';
 import type { TicketRevision } from '../types/TicketRevision';
-import { FolderAdapter, type FolderAdapterOptions } from './FolderAdapter';
+import { FolderAdapter, type FolderAdapterOptions, type PersistOptions } from './FolderAdapter';
 
 export type GitBranchAdapterOptions = FolderAdapterOptions & {
 	/** Push the data branch after each mutation (best-effort). Default true. */
@@ -92,8 +92,8 @@ export class GitBranchAdapter extends FolderAdapter {
 		);
 	}
 
-	protected override async persist(ticket: Ticket, message: string): Promise<void> {
-		await super.persist(ticket, message);
+	protected override async persist(ticket: Ticket, message: string, options: PersistOptions = {}): Promise<void> {
+		await super.persist(ticket, message, options);
 		const relativePath = this.ticketRelativePath(ticket.id);
 		// The file write above is subfolder-scoped and collision-free; only the
 		// shared-index add+commit needs the per-root lock.

@@ -1,4 +1,4 @@
-import { access, mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { type Attachment, type AttachmentKind, type AttachmentType, exec } from '@aylith/tickets-core';
 import type { MediaConfig } from './types/MediaConfig';
@@ -18,26 +18,29 @@ const sanitizeFilename = (filename: string): string => {
 	return base.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || 'upload';
 };
 
-const pathExists = async (path: string): Promise<boolean> => {
-	try {
-		await access(path);
-		return true;
-	} catch {
-		return false;
-	}
-};
+const isAlreadyExists = (error: unknown): boolean =>
+	typeof error === 'object' && error !== null && (error as { code?: string }).code === 'EEXIST';
 
-/** Media paths are immutable on the CDN — never overwrite, pick a fresh name. */
-const uniqueName = async (directory: string, filename: string): Promise<string> => {
+/**
+ * Media paths are immutable on the CDN — never overwrite, pick a fresh name.
+ * The exclusive write is what claims the name: testing first and writing after
+ * lets two concurrent uploads settle on the same candidate.
+ */
+const writeUnique = async (directory: string, filename: string, data: Uint8Array): Promise<string> => {
 	const extension = extname(filename);
 	const stem = filename.slice(0, filename.length - extension.length);
 	let candidate = filename;
 	let counter = 2;
-	while (await pathExists(join(directory, candidate))) {
-		candidate = `${stem}-${counter}${extension}`;
-		counter = counter + 1;
+	for (;;) {
+		try {
+			await writeFile(join(directory, candidate), data, { flag: 'wx' });
+			return candidate;
+		} catch (error) {
+			if (!isAlreadyExists(error)) throw error;
+			candidate = `${stem}-${counter}${extension}`;
+			counter = counter + 1;
+		}
 	}
-	return candidate;
 };
 
 export type PublishInput = {
@@ -62,8 +65,7 @@ export const publishAttachment = async (input: PublishInput): Promise<Attachment
 	const relativeDir = join('media', input.media.pathPrefix, input.projectName, input.ticketId);
 	const absoluteDir = join(input.media.repoPath, relativeDir);
 	await mkdir(absoluteDir, { recursive: true });
-	const name = await uniqueName(absoluteDir, sanitizeFilename(input.filename));
-	await writeFile(join(absoluteDir, name), input.data);
+	const name = await writeUnique(absoluteDir, sanitizeFilename(input.filename), input.data);
 
 	const relativeFile = join(relativeDir, name);
 	await exec('git', ['add', '--', relativeFile], input.media.repoPath);

@@ -15,11 +15,20 @@ export type FolderAdapterOptions = {
 	defaultStatus?: string;
 };
 
+/** `exclusive` fails the write when the ticket file already exists, instead of overwriting it. */
+export type PersistOptions = { exclusive?: boolean };
+
+const ID_ALLOCATION_ATTEMPTS = 25;
+
+const isAlreadyExists = (error: unknown): boolean =>
+	typeof error === 'object' && error !== null && (error as { code?: string }).code === 'EEXIST';
+
 /** Plain-folder storage: markdown files, no versioning (revisions are empty). */
 export class FolderAdapter implements StorageAdapter {
 	protected readonly dataDir: string;
 	protected readonly ticketsDir: string;
 	protected readonly defaultStatus: string;
+	private createQueue: Promise<unknown> = Promise.resolve();
 
 	constructor(options: FolderAdapterOptions) {
 		this.dataDir = options.dataDir;
@@ -62,20 +71,42 @@ export class FolderAdapter implements StorageAdapter {
 		}
 	}
 
+	/**
+	 * Ids are derived by scanning the existing tickets, so two creates that
+	 * interleave would allocate the same id. They run one at a time, and the
+	 * first write refuses to clobber an existing file — a concurrent writer
+	 * outside this process costs a retry rather than a lost ticket.
+	 */
 	async create(input: TicketCreateInput): Promise<Ticket> {
+		const run = this.createQueue.then(
+			() => this.createOne(input),
+			() => this.createOne(input),
+		);
+		this.createQueue = run.catch(() => undefined);
+		return run;
+	}
+
+	private async createOne(input: TicketCreateInput): Promise<Ticket> {
 		await mkdir(this.ticketsDir, { recursive: true });
-		const existing = await this.list();
-		const ticket: Ticket = {
-			id: nextTicketId(existing.map((item) => item.id)),
-			title: input.title,
-			status: input.status ?? this.defaultStatus,
-			archived: false,
-			created: new Date().toISOString(),
-			attachments: [],
-			description: input.description ?? '',
-		};
-		await this.persist(ticket, `Create ticket ${ticket.id}`);
-		return ticket;
+		for (let attempt = 0; attempt < ID_ALLOCATION_ATTEMPTS; attempt++) {
+			const existing = await this.list();
+			const ticket: Ticket = {
+				id: nextTicketId(existing.map((item) => item.id)),
+				title: input.title,
+				status: input.status ?? this.defaultStatus,
+				archived: false,
+				created: new Date().toISOString(),
+				attachments: [],
+				description: input.description ?? '',
+			};
+			try {
+				await this.persist(ticket, `Create ticket ${ticket.id}`, { exclusive: true });
+				return ticket;
+			} catch (error) {
+				if (!isAlreadyExists(error)) throw error;
+			}
+		}
+		throw new Error(`Could not allocate a free ticket id in ${this.ticketsDir}`);
 	}
 
 	async update(id: string, patch: TicketPatch, message?: string): Promise<Ticket> {
@@ -108,8 +139,11 @@ export class FolderAdapter implements StorageAdapter {
 		throw new Error(`Adapter has no revision history (ticket ${id})`);
 	}
 
-	protected async persist(ticket: Ticket, _message: string): Promise<void> {
+	protected async persist(ticket: Ticket, _message: string, options: PersistOptions = {}): Promise<void> {
 		await mkdir(this.ticketsDir, { recursive: true });
-		await writeFile(this.ticketPath(ticket.id), serializeTicket(ticket), 'utf8');
+		await writeFile(this.ticketPath(ticket.id), serializeTicket(ticket), {
+			encoding: 'utf8',
+			flag: options.exclusive ? 'wx' : 'w',
+		});
 	}
 }
