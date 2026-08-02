@@ -280,13 +280,19 @@ export const createApp = (context: ServerContext): Hono => {
 
 	app.get('/api/events', (c) =>
 		streamSSE(c, async (stream) => {
+			// A dropped client surfaces as a failing write, an abort, or both — every
+			// exit path has to release the subscription or the bus keeps growing.
 			const unsubscribe = context.events.subscribe((event) => {
-				void stream.writeSSE({ event: 'change', data: event });
+				stream.writeSSE({ event: 'change', data: event }).catch(() => unsubscribe());
 			});
 			stream.onAbort(() => unsubscribe());
-			while (!stream.aborted) {
-				await stream.writeSSE({ event: 'ping', data: String(Date.now()) });
-				await stream.sleep(15000);
+			try {
+				while (!stream.aborted) {
+					await stream.writeSSE({ event: 'ping', data: String(Date.now()) });
+					await stream.sleep(15000);
+				}
+			} finally {
+				unsubscribe();
 			}
 		}),
 	);

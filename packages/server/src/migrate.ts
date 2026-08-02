@@ -1,5 +1,5 @@
 import { access, mkdir, rm } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join, relative } from 'node:path';
 import { exec, migrateTickets, type StoreLocation } from '@aylith/tickets-core';
 import { generateProjectId, projectSubdir } from './identity';
 import { branchExists, DATA_BRANCH, provisionStore, remoteBranchExists } from './init';
@@ -14,6 +14,12 @@ const pathExists = (path: string): Promise<boolean> =>
 		() => true,
 		() => false,
 	);
+
+/** Containment on path segments, so a sibling like `store-backup` is not "inside" `store`. */
+const isInside = (path: string, root: string): boolean => {
+	const fromRoot = relative(root, path);
+	return fromRoot.length > 0 && !fromRoot.startsWith('..') && !isAbsolute(fromRoot);
+};
 
 export type MigrateOptions = {
 	selector: string;
@@ -206,7 +212,7 @@ export const adoptStore = async (dataDir: string, options: { configPath?: string
 	const existing = config.projects.find((project) => project.id === marker.id);
 	if (existing) throw new Error(`Project ${marker.id} ("${existing.name}") is already registered`);
 
-	const scope = dataDir.startsWith(config.storeRoot) ? 'central' : 'repo';
+	const scope = isInside(dataDir, config.storeRoot) ? 'central' : 'repo';
 	let repoPath: string;
 	let location: StoreLocation;
 	if (marker.kind === 'git') {

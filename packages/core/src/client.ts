@@ -51,10 +51,15 @@ export class TicketsClient {
 		this.apiBase = apiBase.replace(/\/$/, '');
 	}
 
+	/** Cached across calls, but only once it resolves — a failure must stay retryable. */
 	meta(): Promise<TicketsMeta> {
 		this.metaCache ??= fetch(`${this.apiBase}/projects`)
 			.then(ensureOk)
-			.then((response) => response.json() as Promise<TicketsMeta>);
+			.then((response) => response.json() as Promise<TicketsMeta>)
+			.catch((error) => {
+				this.metaCache = undefined;
+				throw error;
+			});
 		return this.metaCache;
 	}
 

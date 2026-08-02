@@ -86,7 +86,15 @@ export const runCli = async (argv: string[], options: { webAssets?: WebAssets } 
 		}
 		case 'serve': {
 			const portFlag = readFlag(rest, '--port');
-			await startDaemon({ port: portFlag ? Number.parseInt(portFlag, 10) : undefined, webAssets: options.webAssets });
+			let port: number | undefined;
+			if (portFlag !== undefined) {
+				port = Number.parseInt(portFlag, 10);
+				if (!Number.isInteger(port) || port < 1 || port > 65535) {
+					console.error(`Invalid --port "${portFlag}" (expected 1-65535)`);
+					process.exit(1);
+				}
+			}
+			await startDaemon({ port, webAssets: options.webAssets });
 			return;
 		}
 		case 'tui': {

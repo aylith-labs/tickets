@@ -40,27 +40,37 @@ const registerStaticUi = (app: Hono, webAssets?: WebAssets): void => {
 	});
 };
 
-const watchProjects = (context: ServerContext): void => {
+/** Watches every project's store; returns a disposer that releases the watchers and pending timers. */
+const watchProjects = (context: ServerContext): (() => void) => {
+	const disposers: Array<() => void> = [];
 	for (const project of context.config.projects) {
 		const dataDir = projectLocation(project).dataDir;
 		let debounce: ReturnType<typeof setTimeout> | undefined;
+		const onChange = () => {
+			clearTimeout(debounce);
+			debounce = setTimeout(() => context.events.emit('tickets-updated'), 300);
+		};
+		// The tickets/ dir may not exist until the first ticket — fall back to the data dir.
+		let watcher: ReturnType<typeof watch>;
 		try {
-			watch(join(dataDir, TICKETS_DIR), () => {
-				clearTimeout(debounce);
-				debounce = setTimeout(() => context.events.emit('tickets-updated'), 300);
-			});
+			watcher = watch(join(dataDir, TICKETS_DIR), onChange);
 		} catch {
-			// The tickets/ dir may not exist until the first ticket — watch the data dir instead.
 			try {
-				watch(dataDir, () => {
-					clearTimeout(debounce);
-					debounce = setTimeout(() => context.events.emit('tickets-updated'), 300);
-				});
+				watcher = watch(dataDir, onChange);
 			} catch (error) {
 				console.warn(`tickets: cannot watch ${dataDir}:`, error instanceof Error ? error.message : error);
+				continue;
 			}
 		}
+		disposers.push(() => {
+			clearTimeout(debounce);
+			watcher.close();
+		});
 	}
+	return () => {
+		for (const dispose of disposers) dispose();
+		disposers.length = 0;
+	};
 };
 
 export const startDaemon = async (options: { configPath?: string; port?: number; webAssets?: WebAssets } = {}) => {
@@ -75,12 +85,17 @@ export const startDaemon = async (options: { configPath?: string; port?: number;
 		else if (diagnostic.kind === 'adoptable')
 			console.warn(`tickets: unregistered store at ${diagnostic.path} (run: tickets adopt ${diagnostic.path})`);
 	}
-	if (options.port) config.port = options.port;
+	if (options.port !== undefined) config.port = options.port;
 	const context = createContext(config);
-	watchProjects(context);
-	const app = createApp(context);
-	registerStaticUi(app, options.webAssets);
-	const server = Bun.serve({ port: config.port, fetch: app.fetch, idleTimeout: 0 });
-	console.log(`tickets daemon listening on http://localhost:${config.port} (${config.projects.length} project(s))`);
-	return server;
+	const stopWatching = watchProjects(context);
+	try {
+		const app = createApp(context);
+		registerStaticUi(app, options.webAssets);
+		const server = Bun.serve({ port: config.port, fetch: app.fetch, idleTimeout: 0 });
+		console.log(`tickets daemon listening on http://localhost:${config.port} (${config.projects.length} project(s))`);
+		return Object.assign(server, { stopWatching });
+	} catch (error) {
+		stopWatching();
+		throw error;
+	}
 };
