@@ -6,7 +6,11 @@ on:
   workflow_dispatch:
 
 jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+
   publish:
+    needs: verify
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
@@ -39,3 +43,9 @@ jobs:
 
       - name: Build and publish
         run: bash scripts/publish.sh
+
+      # A self-hosted runner keeps HOME and the workspace between jobs, so the
+      # token above would outlive this run. Must survive a failed publish.
+      - name: Remove npm credentials
+        if: always()
+        run: rm -f ~/.npmrc "${GITHUB_WORKSPACE}/.npmrc"
