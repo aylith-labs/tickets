@@ -43,9 +43,9 @@
 		"clean": "rm -rf dist"
 	},
 	"dependencies": {
-		"@anthropic-ai/sdk": "0.110.0",
+		"@anthropic-ai/sdk": "0.115.0",
 		"@aylith/tickets-core": "workspace:*",
-		"hono": "4.12.28"
+		"hono": "4.12.33"
 	},
 	"devDependencies": {
 		"tsup": "8.5.1",
