@@ -7,7 +7,7 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -21,3 +21,8 @@ jobs:
       - run: bunx tsc --noEmit
       - run: bunx biome check .
       - run: bun run build
+
+      # binary.ts is excluded from tsc (Bun-only `with { type: 'file' }` imports),
+      # so compiling it is the only check it gets. build:bin chains build:web, so
+      # this covers the embedded web bundle too.
+      - run: bun run build:bin

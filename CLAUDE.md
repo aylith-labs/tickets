@@ -40,7 +40,7 @@ make serve-bg       # run the daemon in the background (tickets.lvh.me)
   `TicketsClient` (exposed at the `./client` subpath so browser bundles never pull the
   Node-only adapters).
 - `packages/server` (`@aylith/tickets-server`) — Hono daemon + `tickets` CLI
-  (`init`/`serve`/`tui`/`list`/`migrate`/`converge`/`rename`). REST + SSE, terminal
+  (`init`/`serve`/`tui`/`list`/`migrate`/`converge`/`rename`/`adopt`). REST + SSE, terminal
   launch, AI enrich (claude-cli / Anthropic / OpenAI-compatible), media pipeline.
   `cli.ts` (npm, on-disk web) and `binary.ts` (`bun --compile`, embeds `apps/web/dist`)
   both call the shared `runCli`.
@@ -76,4 +76,6 @@ make serve-bg       # run the daemon in the background (tickets.lvh.me)
 - `binary.ts` is excluded from `tsc` (Bun-only `with { type: 'file' }` imports); it's
   validated by `bun --compile` in CI/release only.
 - No inline `biome-ignore`; fix the code or adjust `biome.json`.
-- CI runner is `ubuntu-latest` (public repo, per the handbook).
+- Every workflow job uses `runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}` per the handbook.
+  This repo is public, so it resolves to the GitHub-hosted runner — public repos must never
+  reach the org's self-hosted runner.
