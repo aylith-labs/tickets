@@ -47,6 +47,6 @@
 		"@types/react": "19.2.18",
 		"ink-testing-library": "4.0.0",
 		"tsup": "8.5.1",
-		"typescript": "7.1.0-dev.20260802.1"
+		"typescript": "7.0.2"
 	}
 }
