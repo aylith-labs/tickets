@@ -1,0 +1,229 @@
+# Deploy-failure alerting. Opens a single GitHub issue the first time a ship-path
+# workflow in this repo fails, keeps that one issue current while it stays red,
+# and closes it when the workflow succeeds again.
+#
+# Canonical copy lives in aylith-labs/aylith-com (.aylith/templates/). Rolled out
+# to shipping repos by aylith-com/scripts/rollout-deploy-alert.sh — edit there,
+# not here. The watched-workflow list below is generated per repo from
+# aylith-com/.aylith/deploy-alert-targets.json.
+#
+# workflow_run only ever runs the copy of this file that is on the default
+# branch, whatever branch or tag the failing run came from. So the rollout writes
+# straight to the default branch, and an edit here is live for every subsequent
+# run without anything being merged.
+#
+# Uses only the built-in GITHUB_TOKEN — there is no secret to provision.
+name: Deploy alert
+
+on:
+  workflow_run:
+    # Matched against each workflow's `name:`, not its filename. Deliberately
+    # limited to the workflows that ship something: a red CI on a branch is
+    # normal, and routing it here would drown the signal this exists to carry.
+    workflows: ["Publish to npm","Release binaries"]
+    types: [completed]
+
+permissions:
+  issues: write
+  actions: read
+
+concurrency:
+  # Two runs of the same watched workflow finishing together would otherwise race
+  # and each open an issue for what is one broken deploy.
+  group: deploy-alert-${{ github.event.workflow_run.path }}
+  cancel-in-progress: false
+
+jobs:
+  alert:
+    # cancelled / skipped / neutral / action_required are neither a failure nor a
+    # recovery. Gating at job level means they cost no runner minute at all —
+    # Actions bills a 1-minute minimum per job.
+    if: contains(fromJSON('["success","failure","timed_out"]'), github.event.workflow_run.conclusion)
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - id: alert
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const { owner, repo } = context.repo;
+            const LABEL = 'deploy-failure';
+            const FAILED = ['failure', 'timed_out'];
+
+            // Dedupe key: one issue per (repo, workflow file). Carried as a
+            // marker in the body so a renamed issue title cannot orphan it.
+            const MARKER = `<!-- aylith-deploy-alert v1 | path=${run.path} -->`;
+            const STATE = /<!-- state \| count=(\d+) \| firstRunId=(\d+) \| firstAt=(\S+) -->/;
+
+            function humanize(ms) {
+              const minutes = Math.round(ms / 60000);
+              if (minutes < 60) return `${minutes}m`;
+              const hours = Math.floor(minutes / 60);
+              if (hours < 48) return `${hours}h ${minutes % 60}m`;
+              return `${Math.floor(hours / 24)}d ${hours % 24}h`;
+            }
+
+            function commitLink() {
+              const short = run.head_sha.slice(0, 7);
+              const url = `https://github.com/${owner}/${repo}/commit/${run.head_sha}`;
+              const subject = (run.head_commit?.message ?? '').split('\n')[0];
+              return subject ? `[\`${short}\`](${url}) — ${subject}` : `[\`${short}\`](${url})`;
+            }
+
+            // listForRepo is immediately consistent. The issue *search* API lags
+            // by up to a minute, which is long enough for two quick failures to
+            // each conclude no issue exists and open one.
+            const openIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', labels: LABEL, per_page: 100,
+            });
+            const existing = openIssues.find(
+              (issue) => !issue.pull_request && (issue.body ?? '').includes(MARKER),
+            );
+
+            if (run.conclusion === 'success') {
+              if (!existing) {
+                core.info(`${run.name} succeeded and no alert is open — nothing to do.`);
+                core.setOutput('action', 'none');
+                return;
+              }
+              const state = STATE.exec(existing.body ?? '');
+              const failures = state ? state[1] : 'an unknown number of';
+              const window = state
+                ? humanize(Date.now() - Date.parse(state[3]))
+                : 'an unknown period';
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: existing.number,
+                body: [
+                  `## Recovered`,
+                  ``,
+                  `[\`${run.name}\` #${run.run_number}](${run.html_url}) succeeded on ${commitLink()}.`,
+                  ``,
+                  `It had failed **${failures}** time(s) over ${window}. Closing — a later failure opens a fresh issue.`,
+                ].join('\n'),
+              });
+              await github.rest.issues.update({
+                owner, repo, issue_number: existing.number,
+                state: 'closed', state_reason: 'completed',
+              });
+              core.setOutput('action', 'closed');
+              core.setOutput('url', existing.html_url);
+              return;
+            }
+
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              owner, repo, run_id: run.id, filter: 'latest', per_page: 100,
+            });
+            const failedJobs = jobs.filter((job) => FAILED.includes(job.conclusion));
+            const jobLines = failedJobs.length
+              ? failedJobs.map((job) => {
+                  const step = (job.steps ?? []).find((entry) => FAILED.includes(entry.conclusion));
+                  // #step:<n>:1 opens the log already scrolled to the failing step.
+                  const link = step ? `${job.html_url}#step:${step.number}:1` : job.html_url;
+                  const where = step ? ` — failed at step **${step.name}**` : '';
+                  return `- **${job.name}**${where} → [open the failing log](${link})`;
+                })
+              : [`- No individual job reported a failure; the run concluded \`${run.conclusion}\`. [Open the run](${run.html_url}).`];
+
+            function buildBody({ count, firstRunId, firstAt }) {
+              return [
+                MARKER,
+                `<!-- state | count=${count} | firstRunId=${firstRunId} | firstAt=${firstAt} -->`,
+                ``,
+                `**\`${run.name}\`** (\`${run.path}\`) is failing, so this repo is not shipping.`,
+                ``,
+                `### Latest failure`,
+                ``,
+                `| | |`,
+                `| --- | --- |`,
+                `| Run | [#${run.run_number} · attempt ${run.run_attempt}](${run.html_url}) |`,
+                `| Conclusion | \`${run.conclusion}\` |`,
+                `| Commit | ${commitLink()} |`,
+                `| Ref | \`${run.head_branch ?? '—'}\` |`,
+                `| Trigger | \`${run.event}\` by @${run.triggering_actor?.login ?? run.actor?.login ?? 'unknown'} |`,
+                `| Finished | ${run.updated_at} |`,
+                ``,
+                `### Failing jobs`,
+                ``,
+                ...jobLines,
+                ``,
+                `### Streak`,
+                ``,
+                `- Consecutive failures: **${count}**`,
+                `- Failing since ${firstAt} — [first failed run](https://github.com/${owner}/${repo}/actions/runs/${firstRunId})`,
+                ``,
+                `---`,
+                ``,
+                `Opened and maintained by \`.github/workflows/deploy-alert.yml\`. Repeat failures update this issue rather than opening new ones, and it closes itself the next time \`${run.name}\` succeeds.`,
+              ].join('\n');
+            }
+
+            if (!existing) {
+              try {
+                await github.rest.issues.createLabel({
+                  owner, repo, name: LABEL, color: 'b60205',
+                  description: 'A deploy or publish workflow is failing',
+                });
+              } catch (error) {
+                if (error.status !== 422) throw error;
+              }
+              const created = await github.rest.issues.create({
+                owner, repo,
+                title: `${run.name} is failing`,
+                labels: [LABEL],
+                body: buildBody({ count: 1, firstRunId: run.id, firstAt: run.updated_at }),
+              });
+              core.setOutput('action', 'opened');
+              core.setOutput('url', created.data.html_url);
+              return;
+            }
+
+            const state = STATE.exec(existing.body ?? '');
+            const count = (state ? Number(state[1]) : 0) + 1;
+            const firstRunId = state ? state[2] : run.id;
+            const firstAt = state ? state[3] : run.updated_at;
+
+            await github.rest.issues.update({
+              owner, repo, issue_number: existing.number,
+              body: buildBody({ count, firstRunId, firstAt }),
+            });
+
+            // Editing a body notifies nobody; a comment does. Comment on an
+            // escalating schedule so a workflow that fails 31 times running
+            // produces a handful of pings instead of 31 — the noise that made
+            // the last long outage invisible.
+            const escalate = [2, 5, 10, 25, 50].includes(count) || (count > 50 && count % 50 === 0);
+            if (escalate) {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: existing.number,
+                body: [
+                  `\`${run.name}\` has now failed **${count}** times in a row, unbroken since ${firstAt}.`,
+                  ``,
+                  `Latest: [#${run.run_number}](${run.html_url}) on ${commitLink()}.`,
+                ].join('\n'),
+              });
+            }
+            core.setOutput('action', escalate ? 'escalated' : 'updated');
+            core.setOutput('url', existing.html_url);
+
+      - name: Summary
+        if: always()
+        # Values arrive as env, never interpolated into the script — a workflow
+        # name or commit subject is attacker-influenced text.
+        env:
+          WATCHED: ${{ github.event.workflow_run.name }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          RESULT: ${{ steps.alert.outputs.action }}
+          ISSUE_URL: ${{ steps.alert.outputs.url }}
+        run: |
+          {
+            echo "### Deploy alert"
+            echo
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Watched workflow | \`${WATCHED}\` |"
+            echo "| Conclusion | \`${CONCLUSION}\` |"
+            echo "| Run | ${RUN_URL} |"
+            echo "| Action taken | \`${RESULT:-none}\` |"
+            echo "| Issue | ${ISSUE_URL:-none} |"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
