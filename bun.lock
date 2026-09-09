@@ -203,13 +203,13 @@
 
     "@lit/reactive-element": ["@lit/reactive-element@2.1.2", "", { "dependencies": { "@lit-labs/ssr-dom-shim": "^1.5.0" } }, "sha512-pbCDiVMnne1lYUIaYNN5wrwQXDtHaYtg7YEFPeW+hws6U47WeFvISGUWekPGKWOP1ygrs0ef0o1VJMk1exos5A=="],
 
-    "@module-federation/error-codes": ["@module-federation/error-codes@2.9.0", "http://r.privjs.com/@module-federation%2ferror-codes/-/error-codes-2.9.0.tgz", {}, "sha512-IGpd+VRlji3NyGOGGTsk7YEmPRKcDoBK4YHqIuP+OQwyb2YhHCUHO2vW9RXeQxCuKwi+c6xkTweRYG+Umy+0Zw=="],
+    "@module-federation/error-codes": ["@module-federation/error-codes@2.9.0", "https://registry.npmjs.org/@module-federation/error-codes/-/error-codes-2.9.0.tgz", {}, "sha512-IGpd+VRlji3NyGOGGTsk7YEmPRKcDoBK4YHqIuP+OQwyb2YhHCUHO2vW9RXeQxCuKwi+c6xkTweRYG+Umy+0Zw=="],
 
-    "@module-federation/runtime": ["@module-federation/runtime@2.9.0", "http://r.privjs.com/@module-federation%2fruntime/-/runtime-2.9.0.tgz", { "dependencies": { "@module-federation/error-codes": "2.9.0", "@module-federation/runtime-core": "2.9.0", "@module-federation/sdk": "2.9.0" } }, "sha512-3cyAav0hWP+dNvB7qrcK9CKxQn+JvkbRvLtZz3zS2g0EyxtDFDjgbHY0Afcf7oHf8IHhKeEdzb/3Kjr1Pjmr7A=="],
+    "@module-federation/runtime": ["@module-federation/runtime@2.9.0", "https://registry.npmjs.org/@module-federation/runtime/-/runtime-2.9.0.tgz", { "dependencies": { "@module-federation/error-codes": "2.9.0", "@module-federation/runtime-core": "2.9.0", "@module-federation/sdk": "2.9.0" } }, "sha512-3cyAav0hWP+dNvB7qrcK9CKxQn+JvkbRvLtZz3zS2g0EyxtDFDjgbHY0Afcf7oHf8IHhKeEdzb/3Kjr1Pjmr7A=="],
 
-    "@module-federation/runtime-core": ["@module-federation/runtime-core@2.9.0", "http://r.privjs.com/@module-federation%2fruntime-core/-/runtime-core-2.9.0.tgz", { "dependencies": { "@module-federation/error-codes": "2.9.0", "@module-federation/sdk": "2.9.0" } }, "sha512-dLykRYfpbEJBTdk2NlbNoVVTB196O3qujawTBguLABJkPCWETJNk60NR1yZO34eI+DTH+eGwHU3m7FddAWnbnw=="],
+    "@module-federation/runtime-core": ["@module-federation/runtime-core@2.9.0", "https://registry.npmjs.org/@module-federation/runtime-core/-/runtime-core-2.9.0.tgz", { "dependencies": { "@module-federation/error-codes": "2.9.0", "@module-federation/sdk": "2.9.0" } }, "sha512-dLykRYfpbEJBTdk2NlbNoVVTB196O3qujawTBguLABJkPCWETJNk60NR1yZO34eI+DTH+eGwHU3m7FddAWnbnw=="],
 
-    "@module-federation/sdk": ["@module-federation/sdk@2.9.0", "http://r.privjs.com/@module-federation%2fsdk/-/sdk-2.9.0.tgz", {}, "sha512-IMjObgBGQTXd33jTTCYcxvz8iOQGLsZ2QIPOj90rDxuBtJsN4WJwYyXqligrhY/e5p/BipUPdbIgKmWL7zFhTw=="],
+    "@module-federation/sdk": ["@module-federation/sdk@2.9.0", "https://registry.npmjs.org/@module-federation/sdk/-/sdk-2.9.0.tgz", {}, "sha512-IMjObgBGQTXd33jTTCYcxvz8iOQGLsZ2QIPOj90rDxuBtJsN4WJwYyXqligrhY/e5p/BipUPdbIgKmWL7zFhTw=="],
 
     "@napi-rs/lzma-linux-x64-gnu": ["@napi-rs/lzma-linux-x64-gnu@1.5.1", "", { "os": "linux", "cpu": "x64" }, "sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ=="],
 
