@@ -31,6 +31,7 @@ export const parseTicket = (raw: string): Ticket => {
 		updated: toIsoString(data.updated),
 		attachments: attachmentsRaw.map(toAttachment).filter((item): item is Attachment => item !== null),
 		description: content.trim(),
+		...(data.incidentProvenance === undefined ? {} : { incidentProvenance: data.incidentProvenance }),
 	};
 };
 
@@ -43,6 +44,7 @@ export const serializeTicket = (ticket: Ticket): string => {
 		created: ticket.created,
 	};
 	if (ticket.updated) frontmatter.updated = ticket.updated;
+	if (ticket.incidentProvenance !== undefined) frontmatter.incidentProvenance = ticket.incidentProvenance;
 	if (ticket.attachments.length > 0)
 		frontmatter.attachments = ticket.attachments.map((attachment) => ({ ...attachment }));
 	const body = ticket.description.length > 0 ? `${ticket.description.trim()}\n` : '';

@@ -13,6 +13,14 @@ const ticket: Ticket = {
 };
 
 describe('composePrompt', () => {
+	test('uses stable encoded project identity without changing the display name', () => {
+		const prompt = composePrompt(
+			ticket,
+			{ id: 'stable ?#', name: 'Same name', repoPath: '/fixture' },
+			{ apiBase: 'http://localhost/api', template: '$PROJECT_NAME $TICKET_API' },
+		);
+		expect(prompt).toBe('Same name http://localhost/api/tickets/stable%20%3F%23/0042');
+	});
 	test('fills every placeholder of the default template', () => {
 		const prompt = composePrompt(
 			ticket,

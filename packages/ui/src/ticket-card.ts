@@ -4,6 +4,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import type { TicketsClient, TicketsMeta, TicketWithProject } from './client';
 import type { KebabItem } from './kebab-menu';
 import { tokens } from './theme';
+import { ticketProjectKey } from './ticket-selection';
 import './kebab-menu';
 import './status-chip';
 
@@ -116,7 +117,7 @@ export class AyTicketCard extends LitElement {
 		if (!event.dataTransfer) return;
 		event.dataTransfer.setData(
 			'application/x-ay-ticket',
-			JSON.stringify({ project: this.ticket.project, id: this.ticket.id }),
+			JSON.stringify({ project: ticketProjectKey(this.ticket), id: this.ticket.id }),
 		);
 		event.dataTransfer.effectAllowed = 'move';
 	}
@@ -144,7 +145,8 @@ export class AyTicketCard extends LitElement {
 	 */
 	private async loadUndoState(): Promise<void> {
 		this.undo = undefined;
-		const { project, id } = this.ticket;
+		const { id } = this.ticket;
+		const project = ticketProjectKey(this.ticket);
 		try {
 			const [latest, previous] = await this.client.revisions(project, id);
 			if (!latest || !previous || !latest.message.startsWith('Enrich ')) return;
@@ -156,7 +158,8 @@ export class AyTicketCard extends LitElement {
 	}
 
 	private undoItem({ target, restored }: UndoState): KebabItem {
-		const { project, id } = this.ticket;
+		const { id } = this.ticket;
+		const project = ticketProjectKey(this.ticket);
 		const titleChanged = restored.title !== this.ticket.title;
 		const descriptionChanged = restored.description !== this.ticket.description;
 		return {
@@ -186,7 +189,8 @@ export class AyTicketCard extends LitElement {
 	}
 
 	private kebabItems(): KebabItem[] {
-		const { project, id } = this.ticket;
+		const { id } = this.ticket;
+		const project = ticketProjectKey(this.ticket);
 		const items: KebabItem[] = [
 			{
 				label: 'Copy prompt',

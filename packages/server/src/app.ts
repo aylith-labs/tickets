@@ -4,8 +4,11 @@ import { cors } from 'hono/cors';
 import { streamSSE } from 'hono/streaming';
 import type { ServerContext } from './context';
 import { runStatusChangeHook } from './hooks';
+import { type IncidentTriageOptions, registerIncidentTriageRoutes } from './incident-triage';
 import { buildLaunchCommand } from './launch';
 import { projectLocation } from './registry';
+import type { TicketsRequestObserver } from './request-observation';
+import { registerSuiteContextRoutes } from './suite-context';
 import type { ProjectEntry } from './types/ProjectEntry';
 
 const isAllowedOrigin = (origin: string): boolean => {
@@ -20,21 +23,45 @@ const isAllowedOrigin = (origin: string): boolean => {
 };
 
 type ResolvedProject = { project: ProjectEntry; adapter: StorageAdapter };
+type ProjectFailure = { error: string; status: 404 | 409 | 503 };
 
-export const createApp = (context: ServerContext): Hono => {
+export const createApp = (
+	context: ServerContext,
+	options: {
+		local?: boolean;
+		incidentTriage?: IncidentTriageOptions;
+		requestObservation?: TicketsRequestObserver;
+	} = {},
+): Hono => {
 	const app = new Hono();
+	if (options.requestObservation) app.use('*', options.requestObservation.middleware);
+	if (options.incidentTriage) registerIncidentTriageRoutes(app, { ...options.incidentTriage, context });
+	registerSuiteContextRoutes(app, context);
 
 	// Covers /api/* and the /components.js bundle — embedded pages on other
 	// *.lvh.me apps fetch the components module cross-origin (CORS-mode).
 	app.use('*', cors({ origin: (origin) => (isAllowedOrigin(origin) ? origin : undefined) }));
 
-	const resolveProject = (key: string): ResolvedProject | null => {
-		const project =
-			context.config.projects.find((entry) => entry.id === key) ??
-			context.config.projects.find((entry) => entry.name === key);
-		if (!project) return null;
+	const registryFailure = (): ProjectFailure | null => {
+		const keys = new Set<string>();
+		for (const entry of context.config.projects) {
+			const key = entry.id ?? entry.name;
+			if (!key || keys.has(key)) return { error: 'Ambiguous project configuration', status: 409 };
+			keys.add(key);
+		}
+		return null;
+	};
+	const resolveProject = (key: string): ResolvedProject | ProjectFailure => {
+		const failure = registryFailure();
+		if (failure) return failure;
+		const exact = context.config.projects.filter((entry) => entry.id === key);
+		const matches = exact.length ? exact : context.config.projects.filter((entry) => entry.name === key);
+		if (matches.length > 1) return { error: 'Ambiguous project name', status: 409 };
+		const project = matches[0];
+		if (!project) return { error: 'Unknown project', status: 404 };
+		if (project.unavailable) return { error: 'Project unavailable', status: 503 };
 		const adapter = context.adapters.get(project.id ?? project.name);
-		return adapter ? { project, adapter } : null;
+		return adapter ? { project, adapter } : { error: 'Project unavailable', status: 503 };
 	};
 
 	app.get('/api/projects', (c) =>
@@ -62,16 +89,24 @@ export const createApp = (context: ServerContext): Hono => {
 			enrichProviders: context.config.enrich.providers.map(({ id }) => id),
 			apiBase: context.config.apiBase,
 			storeRoots: { store: context.config.storeRoot, worktrees: context.config.worktreesRoot },
+			capabilities: {
+				mediaUpload: options.local
+					? { available: false, reason: 'local-mode' }
+					: context.config.media
+						? { available: true }
+						: { available: false, reason: 'not-configured' },
+			},
 		}),
 	);
 
 	app.get('/api/tickets', async (c) => {
 		const projectFilter = c.req.query('project');
 		const includeArchived = c.req.query('archived') === 'true';
-		const projects = projectFilter
-			? context.config.projects.filter((entry) => entry.id === projectFilter || entry.name === projectFilter)
-			: context.config.projects;
-		if (projectFilter && projects.length === 0) return c.json({ error: `Unknown project ${projectFilter}` }, 404);
+		const failure = registryFailure();
+		if (failure) return c.json({ error: failure.error }, failure.status);
+		const resolved = projectFilter !== undefined ? resolveProject(projectFilter) : undefined;
+		if (resolved && 'error' in resolved) return c.json({ error: resolved.error }, resolved.status);
+		const projects = resolved ? [resolved.project] : context.config.projects;
 		const lists = await Promise.all(
 			projects.map(async (project) => {
 				const adapter = context.adapters.get(project.id ?? project.name);
@@ -90,26 +125,26 @@ export const createApp = (context: ServerContext): Hono => {
 			return c.json({ error: 'project and title are required' }, 400);
 		}
 		const resolved = resolveProject(body.project);
-		if (!resolved) return c.json({ error: `Unknown project ${body.project}` }, 404);
+		if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
 		const ticket = await resolved.adapter.create({
 			title: body.title.trim(),
 			description: typeof body.description === 'string' ? body.description : undefined,
 		});
 		context.events.emit('tickets-updated');
-		return c.json({ ...ticket, project: resolved.project.name }, 201);
+		return c.json({ ...ticket, project: resolved.project.name, projectId: resolved.project.id }, 201);
 	});
 
 	app.get('/api/tickets/:project/:id', async (c) => {
 		const resolved = resolveProject(c.req.param('project'));
-		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
+		if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
 		const ticket = await resolved.adapter.get(c.req.param('id'));
 		if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
-		return c.json({ ...ticket, project: resolved.project.name });
+		return c.json({ ...ticket, project: resolved.project.name, projectId: resolved.project.id });
 	});
 
 	app.patch('/api/tickets/:project/:id', async (c) => {
 		const resolved = resolveProject(c.req.param('project'));
-		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
+		if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
 		const id = c.req.param('id');
 		const current = await resolved.adapter.get(id);
 		if (!current) return c.json({ error: 'Ticket not found' }, 404);
@@ -135,27 +170,27 @@ export const createApp = (context: ServerContext): Hono => {
 			runStatusChangeHook(context.config.onStatusChange, resolved.project.name, updated, current.status, patch.status);
 		}
 		context.events.emit('tickets-updated');
-		return c.json({ ...updated, project: resolved.project.name });
+		return c.json({ ...updated, project: resolved.project.name, projectId: resolved.project.id });
 	});
 
 	app.post('/api/tickets/:project/:id/archive', async (c) => {
 		const resolved = resolveProject(c.req.param('project'));
-		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
+		if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
 		const ticket = await resolved.adapter.get(c.req.param('id'));
 		if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
 		const archived = await resolved.adapter.archive(ticket.id);
 		context.events.emit('tickets-updated');
-		return c.json({ ...archived, project: resolved.project.name });
+		return c.json({ ...archived, project: resolved.project.name, projectId: resolved.project.id });
 	});
 
 	app.get('/api/tickets/:project/:id/prompt', async (c) => {
 		const resolved = resolveProject(c.req.param('project'));
-		if (!resolved) return c.text('Unknown project', 404);
+		if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
 		const ticket = await resolved.adapter.get(c.req.param('id'));
 		if (!ticket) return c.text('Ticket not found', 404);
 		const prompt = composePrompt(
 			ticket,
-			{ name: resolved.project.name, repoPath: resolved.project.repoPath },
+			{ id: resolved.project.id, name: resolved.project.name, repoPath: resolved.project.repoPath },
 			{ apiBase: context.config.apiBase, template: context.config.promptTemplate },
 		);
 		return c.text(prompt, 200, { 'content-type': 'text/plain; charset=utf-8' });
@@ -163,7 +198,7 @@ export const createApp = (context: ServerContext): Hono => {
 
 	app.post('/api/tickets/:project/:id/launch', async (c) => {
 		const resolved = resolveProject(c.req.param('project'));
-		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
+		if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
 		const id = c.req.param('id');
 		const ticket = await resolved.adapter.get(id);
 		if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
@@ -176,7 +211,7 @@ export const createApp = (context: ServerContext): Hono => {
 		const apiBase = context.config.apiBase.replace(/\/$/, '');
 		const command = buildLaunchCommand(terminal.command, {
 			repoPath: resolved.project.repoPath,
-			promptUrl: `${apiBase}/tickets/${resolved.project.name}/${id}/prompt`,
+			promptUrl: `${apiBase}/tickets/${encodeURIComponent(resolved.project.id ?? resolved.project.name)}/${id}/prompt`,
 		});
 		context.runCommand(command);
 
@@ -186,12 +221,16 @@ export const createApp = (context: ServerContext): Hono => {
 			runStatusChangeHook(context.config.onStatusChange, resolved.project.name, updated, ticket.status, 'in_progress');
 			context.events.emit('tickets-updated');
 		}
-		return c.json({ launched: true, terminal: terminal.id, ticket: { ...updated, project: resolved.project.name } });
+		return c.json({
+			launched: true,
+			terminal: terminal.id,
+			ticket: { ...updated, project: resolved.project.name, projectId: resolved.project.id },
+		});
 	});
 
 	app.post('/api/tickets/:project/:id/enrich', async (c) => {
 		const resolved = resolveProject(c.req.param('project'));
-		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
+		if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
 		const id = c.req.param('id');
 		const ticket = await resolved.adapter.get(id);
 		if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
@@ -209,7 +248,7 @@ export const createApp = (context: ServerContext): Hono => {
 				`Enrich ticket ${id}`,
 			);
 			context.events.emit('tickets-updated');
-			return c.json({ ...updated, project: resolved.project.name });
+			return c.json({ ...updated, project: resolved.project.name, projectId: resolved.project.id });
 		} catch (error) {
 			return c.json({ error: error instanceof Error ? error.message : 'Enrich failed' }, 502);
 		}
@@ -217,26 +256,26 @@ export const createApp = (context: ServerContext): Hono => {
 
 	app.get('/api/tickets/:project/:id/revisions', async (c) => {
 		const resolved = resolveProject(c.req.param('project'));
-		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
+		if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
 		const revisions = await resolved.adapter.getRevisions(c.req.param('id'));
 		return c.json({ revisions });
 	});
 
 	app.get('/api/tickets/:project/:id/revisions/:ref', async (c) => {
 		const resolved = resolveProject(c.req.param('project'));
-		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
+		if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
 		const revision = await resolved.adapter.getRevision(c.req.param('id'), c.req.param('ref'));
 		if (!revision) return c.json({ error: 'Revision not found' }, 404);
-		return c.json({ ...revision, project: resolved.project.name });
+		return c.json({ ...revision, project: resolved.project.name, projectId: resolved.project.id });
 	});
 
 	app.post('/api/tickets/:project/:id/revisions/:ref/restore', async (c) => {
 		const resolved = resolveProject(c.req.param('project'));
-		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
+		if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
 		try {
 			const restored = await resolved.adapter.restoreRevision(c.req.param('id'), c.req.param('ref'));
 			context.events.emit('tickets-updated');
-			return c.json({ ...restored, project: resolved.project.name });
+			return c.json({ ...restored, project: resolved.project.name, projectId: resolved.project.id });
 		} catch (error) {
 			return c.json({ error: error instanceof Error ? error.message : 'Restore failed' }, 400);
 		}
@@ -244,7 +283,9 @@ export const createApp = (context: ServerContext): Hono => {
 
 	app.post('/api/tickets/:project/:id/attachments', async (c) => {
 		const resolved = resolveProject(c.req.param('project'));
-		if (!resolved) return c.json({ error: 'Unknown project' }, 404);
+		if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
+		// Preserve project-scope responses before denying publication, without reading a ticket or body.
+		if (options.local) return c.json({ error: 'Media uploads are unavailable in local mode' }, 503);
 		const id = c.req.param('id');
 		const ticket = await resolved.adapter.get(id);
 		if (!ticket) return c.json({ error: 'Ticket not found' }, 404);
@@ -272,7 +313,7 @@ export const createApp = (context: ServerContext): Hono => {
 				`Attach ${kind} media to ticket ${id}`,
 			);
 			context.events.emit('tickets-updated');
-			return c.json({ ...updated, project: resolved.project.name, attachment }, 201);
+			return c.json({ ...updated, project: resolved.project.name, projectId: resolved.project.id, attachment }, 201);
 		} catch (error) {
 			return c.json({ error: error instanceof Error ? error.message : 'Upload failed' }, 502);
 		}

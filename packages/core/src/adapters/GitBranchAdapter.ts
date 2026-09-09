@@ -53,8 +53,8 @@ export class GitBranchAdapter extends FolderAdapter {
 	}
 
 	async getRevisions(id: string): Promise<TicketRevision[]> {
-		const relativePath = this.ticketRelativePath(id);
 		try {
+			const relativePath = this.ticketRelativePath(id);
 			// No `--follow`: ticket files are never renamed, and in a central store
 			// its rename detection would leak a sibling project's same-id history.
 			const { stdout } = await this.git(['log', '--format=%H%x09%aI%x09%s', '--', relativePath]);
@@ -72,6 +72,9 @@ export class GitBranchAdapter extends FolderAdapter {
 
 	async getRevision(id: string, ref: string): Promise<Ticket | null> {
 		try {
+			// Revisions may be hashes or Git refs, but never CLI options or a
+			// caller-supplied object path overriding this project's ticket path.
+			if (!ref || ref.startsWith('-') || /[:\p{Cc}]/u.test(ref)) return null;
 			const { stdout } = await this.git(['show', `${ref}:./${this.ticketRelativePath(id)}`]);
 			return parseTicket(stdout);
 		} catch {

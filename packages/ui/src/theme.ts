@@ -22,7 +22,8 @@ export const tokens = css`
 		--_border: var(--ay-border, light-dark(#e1ddd3, #332f29));
 		--_text: var(--ay-text, light-dark(#1c1a16, #f3efe8));
 		--_text-muted: var(--ay-text-muted, light-dark(#615b50, #b0a08a));
-		--_accent: var(--ay-accent, light-dark(#c97a3a, #e0a86b));
+		--_accent: var(--ay-accent, light-dark(oklch(0.56 0.13 50), #e0a86b));
+		--_accent-hover: var(--ay-accent-hover, light-dark(oklch(0.46 0.115 50), #e0a86b));
 		--_accent-contrast: var(--ay-accent-contrast, light-dark(#ffffff, #17140f));
 		--_danger: var(--ay-danger, light-dark(#c0492e, #e88a72));
 		--_radius: var(--ay-radius, 8px);
@@ -65,8 +66,8 @@ export const tokens = css`
 	}
 
 	.btn-primary:hover {
-		filter: brightness(1.08);
-		background: var(--_accent);
+		background: var(--_accent-hover);
+		border-color: var(--_accent-hover);
 	}
 
 	input:not([type='checkbox']):not([type='radio']),

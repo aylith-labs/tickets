@@ -1,6 +1,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>tickets</title>
+<!-- Optional deployment-owned destinations. Empty values keep native navigation. -->
+<meta name="aylith-shell-manifest" content="">
+<meta name="aylith-shell-enabled" content="false">
+<meta name="aylith-dashcam-url" content="">
 <style>
 	:root {
 		color-scheme: light dark;
@@ -33,8 +37,9 @@
 		max-width: none;
 	}
 
-	header {
+	.shell > header {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: 1rem;
 		margin-bottom: 1.25rem;
@@ -68,7 +73,7 @@
 	}
 
 	.chip.active {
-		background: light-dark(#c97a3a, #e0a86b);
+		background: var(--ay-accent, light-dark(oklch(0.56 0.13 50), #e0a86b));
 		border-color: transparent;
 		color: light-dark(#fff, #17140f);
 	}
@@ -101,6 +106,39 @@
 	#project-info .warn {
 		color: light-dark(#c0392b, #ff9d9d);
 	}
+	body[data-shell-ready='true'] {
+		padding-top: var(--aylith-shell-header-height, 58px);
+		padding-left: var(--aylith-shell-sidebar-width, 272px);
+	}
+	body[data-shell-ready='true']:has(.aylith-shell[data-sidebar-position='right']) {
+		padding-left: 0;
+		padding-right: var(--aylith-shell-sidebar-width, 272px);
+	}
+	@media (max-width: 760px) {
+		body[data-shell-ready='true'], body[data-shell-ready='true']:has(.aylith-shell[data-sidebar-position='right']) {
+			padding-left: 0;
+			padding-right: 0;
+		}
+	}
+	#shell-controls {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: .75rem;
+		font-size: .75rem;
+		margin-bottom: 1rem;
+	}
+	#shell-controls[hidden] { display: none; }
+	#shell-toggle {
+		font: inherit;
+		padding: .25rem .65rem;
+		border: 1px solid light-dark(#e1ddd3, #332f29);
+		border-radius: 999px;
+		background: none;
+		color: inherit;
+		cursor: pointer;
+	}
+	#shell-toggle:disabled { opacity: .6; cursor: wait; }
 </style>
 <div class="shell">
 	<header>
@@ -108,6 +146,10 @@
 		<nav id="projects" aria-label="Projects"></nav>
 		<button type="button" id="theme-toggle" aria-label="Theme"></button>
 	</header>
+	<div id="shell-controls" hidden>
+		<span id="shell-status" role="status"></span>
+		<button id="shell-toggle" type="button">Retry shared navigation</button>
+	</div>
 	<p id="project-info" aria-live="polite"></p>
 	<main id="app"></main>
 </div>

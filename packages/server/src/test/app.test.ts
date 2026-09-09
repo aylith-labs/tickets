@@ -150,7 +150,7 @@ describe('tickets API', () => {
 		const prompt = await response.text();
 		expect(prompt).toContain('# Prompt me');
 		expect(prompt).toContain('Repository: /tmp/repos/demo');
-		expect(prompt).toContain('https://tickets.lvh.me/api/tickets/demo/0001');
+		expect(prompt).toContain('https://tickets.lvh.me/api/tickets/demo00000001/0001');
 	});
 
 	test('revisions are empty for the folder adapter and restore fails cleanly', async () => {

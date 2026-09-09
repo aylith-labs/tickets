@@ -6,6 +6,16 @@ export { buildEnrichPrompt, ENRICH_SCHEMA } from './enrich/prompt';
 export { enrichTicket } from './enrich/providers';
 export { EventBus, type EventListener } from './events';
 export { runStatusChangeHook } from './hooks';
+export {
+	type IncidentInput,
+	type IncidentScope,
+	type IncidentTriageAuthority,
+	type IncidentTriageConfig,
+	type IncidentTriageEnvelope,
+	type IncidentTriageGrant,
+	type IncidentTriageOptions,
+	registerIncidentTriageRoutes,
+} from './incident-triage';
 export { DATA_BRANCH, type InitOptions, initProject } from './init';
 export { buildLaunchCommand, type LaunchValues, runDetached } from './launch';
 export { attachmentTypeForFilename, type PublishInput, publishAttachment } from './media';
@@ -18,6 +28,13 @@ export {
 	readDaemonConfig,
 	writeDaemonConfig,
 } from './registry';
+export {
+	createRequestObservation,
+	TICKETS_OBSERVED_ROUTES,
+	type TicketsObservationSink,
+	type TicketsRequestObservation,
+	type TicketsRequestObserver,
+} from './request-observation';
 export { startDaemon } from './serve';
 export type { AdapterKind } from './types/AdapterKind';
 export type { DaemonConfig } from './types/DaemonConfig';

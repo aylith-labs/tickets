@@ -2,7 +2,9 @@ import type { TicketRevision } from '@aylith/tickets-core';
 import { css, html, LitElement } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import type { TicketsClient, TicketsMeta, TicketWithProject } from './client';
+import { incidentSource } from './incident-source';
 import { tokens } from './theme';
+import { ticketProjectKey } from './ticket-selection';
 import './status-chip';
 
 @customElement('ay-ticket-detail')
@@ -10,6 +12,7 @@ export class AyTicketDetail extends LitElement {
 	static styles = [
 		tokens,
 		css`
+			.source-link { color: var(--_text); text-decoration: underline; text-underline-offset: 0.15em; }
 			.backdrop {
 				position: fixed;
 				inset: 0;
@@ -69,8 +72,21 @@ export class AyTicketDetail extends LitElement {
 
 			header {
 				display: flex;
+				flex-wrap: wrap;
 				align-items: center;
 				gap: 0.75rem;
+			}
+
+			header .mono {
+				flex: 1 1 14rem;
+				min-width: 0;
+				overflow-wrap: anywhere;
+			}
+
+			header button,
+			header select {
+				flex: 0 0 auto;
+				max-width: 100%;
 			}
 
 			h2 {
@@ -187,10 +203,6 @@ export class AyTicketDetail extends LitElement {
 				justify-content: space-between;
 			}
 
-			.spacer {
-				flex: 1;
-			}
-
 			.danger-btn {
 				color: var(--_danger);
 				border-color: color-mix(in srgb, var(--_danger) 40%, var(--_border));
@@ -198,7 +210,15 @@ export class AyTicketDetail extends LitElement {
 
 			.upload-row {
 				display: flex;
+				flex-wrap: wrap;
 				gap: 0.5rem;
+			}
+
+			.media-note {
+				color: var(--_text-muted);
+				font-size: 0.8125rem;
+				line-height: 1.5;
+				margin: 0;
 			}
 
 			.upload-error {
@@ -239,7 +259,7 @@ export class AyTicketDetail extends LitElement {
 	/** While docked the element stays mounted across ticket switches — reload history. */
 	updated(changed: Map<string, unknown>): void {
 		const previous = changed.get('ticket') as TicketWithProject | undefined;
-		if (previous && (previous.id !== this.ticket.id || previous.project !== this.ticket.project)) {
+		if (previous && (previous.id !== this.ticket.id || ticketProjectKey(previous) !== ticketProjectKey(this.ticket))) {
 			this.editing = false;
 			void this.loadRevisions();
 		}
@@ -250,7 +270,7 @@ export class AyTicketDetail extends LitElement {
 	}
 
 	private async loadRevisions(): Promise<void> {
-		this.revisions = await this.client.revisions(this.ticket.project, this.ticket.id).catch(() => []);
+		this.revisions = await this.client.revisions(ticketProjectKey(this.ticket), this.ticket.id).catch(() => []);
 	}
 
 	private close(): void {
@@ -266,7 +286,7 @@ export class AyTicketDetail extends LitElement {
 	private async saveEdit(event: SubmitEvent): Promise<void> {
 		event.preventDefault();
 		const data = new FormData(event.currentTarget as HTMLFormElement);
-		const updated = await this.client.patch(this.ticket.project, this.ticket.id, {
+		const updated = await this.client.patch(ticketProjectKey(this.ticket), this.ticket.id, {
 			title: String(data.get('title') ?? '').trim(),
 			description: String(data.get('description') ?? ''),
 		});
@@ -276,28 +296,46 @@ export class AyTicketDetail extends LitElement {
 
 	private async setStatus(event: Event): Promise<void> {
 		const status = (event.currentTarget as HTMLSelectElement).value;
-		this.changed(await this.client.patch(this.ticket.project, this.ticket.id, { status }));
+		this.changed(await this.client.patch(ticketProjectKey(this.ticket), this.ticket.id, { status }));
 	}
 
 	private async restore(ref: string): Promise<void> {
-		this.changed(await this.client.restore(this.ticket.project, this.ticket.id, ref));
+		this.changed(await this.client.restore(ticketProjectKey(this.ticket), this.ticket.id, ref));
 	}
 
 	private async archive(): Promise<void> {
-		await this.client.archive(this.ticket.project, this.ticket.id);
+		await this.client.archive(ticketProjectKey(this.ticket), this.ticket.id);
 		this.dispatchEvent(new CustomEvent('ay-changed', { bubbles: true, composed: true }));
 		this.close();
+	}
+
+	private get mediaUploadAvailable(): boolean {
+		return this.meta?.capabilities?.mediaUpload?.available === true;
+	}
+
+	private get mediaUploadReason(): string {
+		const capability = this.meta?.capabilities?.mediaUpload;
+		if (capability?.available === false) {
+			if (capability.reason === 'local-mode') return 'Media uploads are unavailable in local mode.';
+			if (capability.reason === 'not-configured') return 'Media uploads are not configured.';
+		}
+		return 'Media upload availability is unknown.';
+	}
+
+	private chooseMedia(kind: 'before' | 'after'): void {
+		if (!this.mediaUploadAvailable || this.uploading) return;
+		this.renderRoot.querySelector<HTMLInputElement>(`#media-${kind}`)?.click();
 	}
 
 	private async upload(event: Event, kind: 'before' | 'after'): Promise<void> {
 		const input = event.currentTarget as HTMLInputElement;
 		const file = input.files?.[0];
 		input.value = '';
-		if (!file) return;
+		if (!file || !this.mediaUploadAvailable || this.uploading) return;
 		this.uploading = kind;
 		this.uploadError = '';
 		try {
-			this.changed(await this.client.attach(this.ticket.project, this.ticket.id, file, kind));
+			this.changed(await this.client.attach(ticketProjectKey(this.ticket), this.ticket.id, file, kind));
 		} catch (error) {
 			this.uploadError = error instanceof Error ? error.message : 'Upload failed';
 		} finally {
@@ -321,10 +359,10 @@ export class AyTicketDetail extends LitElement {
 		const before = ticket.attachments.filter((attachment) => attachment.kind === 'before');
 		const after = ticket.attachments.filter((attachment) => attachment.kind === 'after');
 		const other = ticket.attachments.filter((attachment) => attachment.kind === 'other');
+		const source = incidentSource(ticket.incidentProvenance, ticket.projectId);
 		return html`
 					<header>
 						<span class="mono">${ticket.project} / #${ticket.id}</span>
-						<span class="spacer"></span>
 						<select .value=${ticket.status} @change=${this.setStatus} aria-label="Status">
 							${this.meta?.statuses.map(
 								(status) =>
@@ -344,13 +382,21 @@ export class AyTicketDetail extends LitElement {
 						</button>
 						<button class="btn" @click=${this.close}>Close</button>
 					</header>
+					${
+						source.state === 'linked'
+							? html`<div><a class="btn source-link" href=${source.href}
+						target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Open source incident</a></div>`
+							: source.state === 'unsupported'
+								? html`<p>Source incident reference is unavailable or uses an unsupported format.</p>`
+								: null
+					}
 
 					${
 						this.editing
 							? html`
 								<form class="edit-grid" @submit=${this.saveEdit}>
-									<input name="title" .value=${ticket.title} required />
-									<textarea name="description" .value=${ticket.description}></textarea>
+									<input name="title" aria-label="Title" .value=${ticket.title} required />
+									<textarea name="description" aria-label="Description" .value=${ticket.description}></textarea>
 									<div>
 										<button class="btn btn-primary" type="submit">Save</button>
 										<button class="btn" type="button" @click=${() => {
@@ -429,23 +475,35 @@ export class AyTicketDetail extends LitElement {
 
 					<section>
 						<h3 class="section-title">Evidence</h3>
-						<div class="upload-row">
-							${(['before', 'after'] as const).map(
-								(kind) => html`
-									<label class="btn">
-										${this.uploading === kind ? 'Uploading…' : `Add ${kind} media`}
-										<input
-											type="file"
-											accept="image/*,video/*"
-											hidden
-											?disabled=${this.uploading.length > 0}
-											@change=${(event: Event) => this.upload(event, kind)}
-										/>
-									</label>
-								`,
-							)}
-						</div>
-						${this.uploadError ? html`<div class="upload-error">${this.uploadError}</div>` : null}
+						${
+							this.mediaUploadAvailable
+								? html`
+									<div class="upload-row">
+										${(['before', 'after'] as const).map(
+											(kind) => html`
+												<button
+													class="btn"
+													type="button"
+													?disabled=${this.uploading.length > 0}
+													@click=${() => this.chooseMedia(kind)}
+												>
+													${this.uploading === kind ? 'Uploading…' : `Add ${kind} media`}
+												</button>
+												<input
+													id=${`media-${kind}`}
+													type="file"
+													accept="image/*,video/*"
+													hidden
+													?disabled=${this.uploading.length > 0}
+													@change=${(event: Event) => this.upload(event, kind)}
+												/>
+											`,
+										)}
+									</div>
+									${this.uploadError ? html`<div class="upload-error" role="status">${this.uploadError}</div>` : null}
+								`
+								: html`<p class="media-note">${this.mediaUploadReason}</p>`
+						}
 					</section>
 
 					<footer>

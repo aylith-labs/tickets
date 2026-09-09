@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import { initProject } from './init';
 import { adoptStore, convergeProjects, type MigrateOutcome, migrateProject, renameProject } from './migrate';
 import { projectLocation, readDaemonConfig } from './registry';
-import type { WebAssets } from './serve';
+import type { DaemonOptions, WebAssets } from './serve';
 import { startDaemon } from './serve';
 import { runTui } from './tui';
 import type { AdapterKind } from './types/AdapterKind';
@@ -16,6 +16,7 @@ Usage:
   tickets init [--name <project>] [--into <setup>] [--adapter git|folder]
                [--central] [--remote <url>]              Register the repo you are in
   tickets serve [--port <port>]                          Start the daemon
+                [--local --project-id <id> ...]          Exact IDs, loopback, no reconciliation/push
   tickets tui [--api-base <url>]                         Browse tickets in the terminal
   tickets list                                           Print registered projects
   tickets migrate <project> --to <setup> [--remote <url>] [--cleanup]
@@ -36,6 +37,36 @@ Setups (--into / --to): repo-git (default), repo-folder, central-git, central-fo
 const readFlag = (args: string[], flag: string): string | undefined => {
 	const index = args.indexOf(flag);
 	return index >= 0 ? args[index + 1] : undefined;
+};
+
+/** Strict serve parsing: a misspelled scope flag must not start the whole registry. */
+export const parseServeOptions = (args: string[]): DaemonOptions => {
+	const options: DaemonOptions = {};
+	for (let index = 0; index < args.length; index++) {
+		const flag = args[index];
+		if (flag === '--local') {
+			if (options.local) throw new Error('Duplicate --local');
+			options.local = true;
+			continue;
+		}
+		if (flag !== '--port' && flag !== '--project-id') throw new Error(`Unknown serve option "${flag}"`);
+		const value = args[++index];
+		if (!value || value.startsWith('--')) throw new Error(`Missing value for ${flag}`);
+		if (flag === '--project-id') {
+			options.projectIds ??= [];
+			options.projectIds.push(value);
+		} else {
+			if (options.port !== undefined) throw new Error('Duplicate --port');
+			const port = Number(value);
+			if (!/^\d+$/.test(value) || !Number.isInteger(port) || port < 1 || port > 65535) {
+				throw new Error(`Invalid --port "${value}" (expected 1-65535)`);
+			}
+			options.port = port;
+		}
+	}
+	if (options.projectIds && !options.local) throw new Error('--project-id requires --local');
+	if (options.local && !options.projectIds?.length) throw new Error('--local requires at least one exact --project-id');
+	return options;
 };
 
 const resolveSetup = (into: string | undefined, central: boolean, adapter: AdapterKind | undefined): StoreSetup => {
@@ -85,16 +116,7 @@ export const runCli = async (argv: string[], options: { webAssets?: WebAssets } 
 			return;
 		}
 		case 'serve': {
-			const portFlag = readFlag(rest, '--port');
-			let port: number | undefined;
-			if (portFlag !== undefined) {
-				port = Number.parseInt(portFlag, 10);
-				if (!Number.isInteger(port) || port < 1 || port > 65535) {
-					console.error(`Invalid --port "${portFlag}" (expected 1-65535)`);
-					process.exit(1);
-				}
-			}
-			await startDaemon({ port, webAssets: options.webAssets });
+			await startDaemon({ ...parseServeOptions(rest), webAssets: options.webAssets });
 			return;
 		}
 		case 'tui': {

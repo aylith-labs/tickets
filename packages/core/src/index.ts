@@ -4,6 +4,22 @@ export { type ProjectMeta, TicketsClient, type TicketsMeta, type TicketWithProje
 export { DEFAULT_STATUS, DEFAULT_STATUSES, ID_PAD_WIDTH, TICKETS_DIR } from './constants';
 export { type ExecResult, exec } from './exec';
 export { nextTicketId } from './id';
+export {
+	createIncidentTicket,
+	hasIncidentKeys,
+	type IncidentInput,
+	IncidentPersistenceError,
+	type IncidentProvenance,
+	type IncidentScope,
+	incidentScopeKey,
+	incidentTicketId,
+	isIncidentIdentifier,
+	isIncidentInput,
+	isIncidentRecord,
+	isIncidentScope,
+	isIncidentUuid,
+	readIncidentTicket,
+} from './incident-persistence';
 export { parseTicket, serializeTicket } from './markdown';
 export { type MigrateResult, migrateTickets } from './migrate';
 export { composePrompt, DEFAULT_PROMPT_TEMPLATE, type PromptOptions } from './prompt';

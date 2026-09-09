@@ -1,4 +1,7 @@
 import { type ProjectMeta, TicketsClient, type TicketsMeta } from '@aylith/tickets-ui';
+import { projectHref, projectKey, resolveProjectRoute } from './project-route';
+import { mountShell } from './shell-host';
+import { readTicketRoute } from './ticket-route';
 
 const API_BASE = '/api';
 const THEME_KEY = 'ay-theme';
@@ -13,7 +16,7 @@ const applyTheme = (theme: Theme): void => {
 	if (toggle) toggle.textContent = `theme: ${theme}`;
 };
 
-const initTheme = (): void => {
+const initTheme = (): (() => void) => {
 	let theme = (localStorage.getItem(THEME_KEY) as Theme | null) ?? 'system';
 	if (!THEMES.includes(theme)) theme = 'system';
 	applyTheme(theme);
@@ -22,6 +25,7 @@ const initTheme = (): void => {
 		localStorage.setItem(THEME_KEY, theme);
 		applyTheme(theme);
 	});
+	return () => applyTheme(theme);
 };
 
 const locationSummary = (project: ProjectMeta): string => {
@@ -46,7 +50,7 @@ const renderProjectChips = (meta: TicketsMeta | null, activeProject: string): vo
 	if (!nav || !meta) return;
 	const chips = [makeChip('all', '/', activeProject === '')];
 	for (const project of meta.projects) {
-		const chip = makeChip(project.name, `/${encodeURIComponent(project.name)}`, project.name === activeProject);
+		const chip = makeChip(project.name, projectHref(project), projectKey(project) === activeProject);
 		chip.title = project.unavailable
 			? `${locationSummary(project)} · unavailable: ${project.unavailable}`
 			: locationSummary(project);
@@ -72,7 +76,7 @@ const renderProjectInfo = (meta: TicketsMeta | null, activeProject: string): voi
 		info.textContent = `all projects · store: ${meta.storeRoots.store} · worktrees: ${meta.storeRoots.worktrees}`;
 		return;
 	}
-	const project = meta.projects.find((entry) => entry.name === activeProject);
+	const project = meta.projects.find((entry) => projectKey(entry) === activeProject);
 	if (!project) {
 		info.replaceChildren();
 		return;
@@ -87,15 +91,41 @@ const renderProjectInfo = (meta: TicketsMeta | null, activeProject: string): voi
 };
 
 const main = async (): Promise<void> => {
-	initTheme();
-	const project = decodeURIComponent(location.pathname.replace(/^\/+|\/+$/g, ''));
+	const restoreTheme = initTheme();
 	const meta = await new TicketsClient(API_BASE).meta().catch(() => null);
+	const route = resolveProjectRoute(location.pathname, meta?.projects ?? []);
+	const ticketRoute = readTicketRoute(location.search);
+	const ticketError =
+		ticketRoute.error ||
+		(ticketRoute.id && (route.kind !== 'project' || !route.project.id)
+			? 'Open this ticket through its stable project URL.'
+			: undefined);
+	if (!meta || route.kind === 'error' || ticketError) {
+		const message = document.createElement('p');
+		message.setAttribute('role', 'alert');
+		message.textContent = !meta
+			? 'Cannot reach the tickets daemon. Reload to retry.'
+			: route.kind === 'error'
+				? route.message
+				: (ticketError ?? '');
+		const home = makeChip('All projects', '/', false);
+		document.querySelector('#app')?.replaceChildren(message, home);
+		renderProjectChips(meta, '');
+		void mountShell(meta, 'Project unavailable', restoreTheme);
+		return;
+	}
+	const project = route.kind === 'project' ? projectKey(route.project) : '';
+	if (route.kind === 'project' && location.pathname !== projectHref(route.project)) {
+		history.replaceState(null, '', `${projectHref(route.project)}${location.search}${location.hash}`);
+	}
 	renderProjectChips(meta, project);
 	renderProjectInfo(meta, project);
 	const list = document.createElement('ay-ticket-list');
 	list.setAttribute('api-base', API_BASE);
 	if (project) list.setAttribute('project', project);
+	if (ticketRoute.id) list.setAttribute('ticket-id', ticketRoute.id);
 	document.querySelector('#app')?.append(list);
+	void mountShell(meta, route.kind === 'project' ? route.project.name : 'All projects', restoreTheme);
 	// The docked split wants the whole viewport — drop the shell's width cap while active.
 	document.addEventListener('ay-dock-change', (event) => {
 		const split = Boolean((event as CustomEvent<{ split?: boolean }>).detail?.split);

@@ -22,6 +22,10 @@ export type TicketsMeta = {
 	enrichProviders: string[];
 	apiBase: string;
 	storeRoots: { store: string; worktrees: string };
+	/** Older servers omit capabilities; absence does not establish upload availability. */
+	capabilities?: {
+		mediaUpload: { available: true } | { available: false; reason: 'local-mode' | 'not-configured' };
+	};
 };
 
 const jsonInit = (method: string, body: unknown): RequestInit => ({
@@ -84,44 +88,72 @@ export class TicketsClient {
 		id: string,
 		patch: { title?: string; description?: string; status?: string; archived?: boolean },
 	): Promise<TicketWithProject> {
-		const response = await ensureOk(await fetch(`${this.apiBase}/tickets/${project}/${id}`, jsonInit('PATCH', patch)));
+		const response = await ensureOk(
+			await fetch(
+				`${this.apiBase}/tickets/${encodeURIComponent(project)}/${encodeURIComponent(id)}`,
+				jsonInit('PATCH', patch),
+			),
+		);
 		return (await response.json()) as TicketWithProject;
 	}
 
 	async archive(project: string, id: string): Promise<void> {
-		await ensureOk(await fetch(`${this.apiBase}/tickets/${project}/${id}/archive`, { method: 'POST' }));
+		await ensureOk(
+			await fetch(`${this.apiBase}/tickets/${encodeURIComponent(project)}/${encodeURIComponent(id)}/archive`, {
+				method: 'POST',
+			}),
+		);
 	}
 
 	async prompt(project: string, id: string): Promise<string> {
-		const response = await ensureOk(await fetch(`${this.apiBase}/tickets/${project}/${id}/prompt`));
+		const response = await ensureOk(
+			await fetch(`${this.apiBase}/tickets/${encodeURIComponent(project)}/${encodeURIComponent(id)}/prompt`),
+		);
 		return response.text();
 	}
 
 	async launch(project: string, id: string, terminal: string): Promise<void> {
-		await ensureOk(await fetch(`${this.apiBase}/tickets/${project}/${id}/launch`, jsonInit('POST', { terminal })));
+		await ensureOk(
+			await fetch(
+				`${this.apiBase}/tickets/${encodeURIComponent(project)}/${encodeURIComponent(id)}/launch`,
+				jsonInit('POST', { terminal }),
+			),
+		);
 	}
 
 	async enrich(project: string, id: string, provider?: string): Promise<TicketWithProject> {
 		const response = await ensureOk(
-			await fetch(`${this.apiBase}/tickets/${project}/${id}/enrich`, jsonInit('POST', provider ? { provider } : {})),
+			await fetch(
+				`${this.apiBase}/tickets/${encodeURIComponent(project)}/${encodeURIComponent(id)}/enrich`,
+				jsonInit('POST', provider ? { provider } : {}),
+			),
 		);
 		return (await response.json()) as TicketWithProject;
 	}
 
 	async revisions(project: string, id: string): Promise<TicketRevision[]> {
-		const response = await ensureOk(await fetch(`${this.apiBase}/tickets/${project}/${id}/revisions`));
+		const response = await ensureOk(
+			await fetch(`${this.apiBase}/tickets/${encodeURIComponent(project)}/${encodeURIComponent(id)}/revisions`),
+		);
 		return ((await response.json()) as { revisions: TicketRevision[] }).revisions;
 	}
 
 	/** The ticket's content as of a specific revision (without restoring it). */
 	async revision(project: string, id: string, ref: string): Promise<TicketWithProject> {
-		const response = await ensureOk(await fetch(`${this.apiBase}/tickets/${project}/${id}/revisions/${ref}`));
+		const response = await ensureOk(
+			await fetch(
+				`${this.apiBase}/tickets/${encodeURIComponent(project)}/${encodeURIComponent(id)}/revisions/${encodeURIComponent(ref)}`,
+			),
+		);
 		return (await response.json()) as TicketWithProject;
 	}
 
 	async restore(project: string, id: string, ref: string): Promise<TicketWithProject> {
 		const response = await ensureOk(
-			await fetch(`${this.apiBase}/tickets/${project}/${id}/revisions/${ref}/restore`, { method: 'POST' }),
+			await fetch(
+				`${this.apiBase}/tickets/${encodeURIComponent(project)}/${encodeURIComponent(id)}/revisions/${encodeURIComponent(ref)}/restore`,
+				{ method: 'POST' },
+			),
 		);
 		return (await response.json()) as TicketWithProject;
 	}
@@ -138,7 +170,10 @@ export class TicketsClient {
 		form.append('kind', kind);
 		if (label) form.append('label', label);
 		const response = await ensureOk(
-			await fetch(`${this.apiBase}/tickets/${project}/${id}/attachments`, { method: 'POST', body: form }),
+			await fetch(`${this.apiBase}/tickets/${encodeURIComponent(project)}/${encodeURIComponent(id)}/attachments`, {
+				method: 'POST',
+				body: form,
+			}),
 		);
 		return (await response.json()) as TicketWithProject;
 	}

@@ -2,6 +2,7 @@ import { css, html, LitElement } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { TicketsClient, type TicketsMeta, type TicketWithProject } from './client';
 import { tokens } from './theme';
+import { linkedTicket } from './ticket-selection';
 import './status-chip';
 import './ticket-card';
 import './ticket-detail';
@@ -229,6 +230,7 @@ export class AyTicketList extends LitElement {
 
 	@property({ attribute: 'api-base' }) apiBase = '/api';
 	@property() project = '';
+	@property({ attribute: 'ticket-id' }) ticketId = '';
 
 	@state() private client!: TicketsClient;
 	@state() private meta?: TicketsMeta;
@@ -237,6 +239,8 @@ export class AyTicketList extends LitElement {
 	@state() private selected?: TicketWithProject;
 	@state() private toast = '';
 	@state() private loadError = '';
+	@state() private refreshing = false;
+	@state() private linkError = '';
 	@state() private view: 'list' | 'board' = 'list';
 	@state() private dragStatus = '';
 	@state() private formOpen = false;
@@ -248,6 +252,9 @@ export class AyTicketList extends LitElement {
 	private toastTimer?: ReturnType<typeof setTimeout>;
 	/** Auto-open the form only on the initial load (when there are no tickets yet). */
 	private autoOpenChecked = false;
+	private linkedClosed = false;
+	private refreshSequence = 0;
+	private hasRead = false;
 
 	connectedCallback(): void {
 		super.connectedCallback();
@@ -267,6 +274,7 @@ export class AyTicketList extends LitElement {
 
 	disconnectedCallback(): void {
 		super.disconnectedCallback();
+		this.refreshSequence++;
 		this.unsubscribe?.();
 		clearTimeout(this.toastTimer);
 	}
@@ -282,6 +290,12 @@ export class AyTicketList extends LitElement {
 
 	/** Tell the host page when the split layout engages, so it can widen its container. */
 	updated(changed: Map<string, unknown>): void {
+		if (changed.has('ticketId')) {
+			this.linkedClosed = false;
+			this.linkError = '';
+			if (changed.get('ticketId') !== undefined) this.selected = undefined;
+			this.selectLinkedTicket();
+		}
 		if (changed.has('docked') || changed.has('selected')) {
 			this.dispatchEvent(
 				new CustomEvent('ay-dock-change', {
@@ -294,22 +308,39 @@ export class AyTicketList extends LitElement {
 	}
 
 	private async refresh(): Promise<void> {
+		const sequence = ++this.refreshSequence;
+		this.refreshing = true;
 		try {
 			const tickets = await this.client.list({ project: this.project || undefined, archived: true });
+			if (sequence !== this.refreshSequence || !this.isConnected) return;
 			this.tickets = tickets;
+			this.hasRead = true;
 			this.loadError = '';
 			if (!this.autoOpenChecked) {
 				this.autoOpenChecked = true;
-				if (tickets.length === 0) this.formOpen = true;
+				if (tickets.length === 0 && !this.ticketId) this.formOpen = true;
 			}
 			if (this.selected) {
 				this.selected = tickets.find(
-					(ticket) => ticket.project === this.selected?.project && ticket.id === this.selected?.id,
+					(ticket) =>
+						(ticket.projectId ?? ticket.project) === (this.selected?.projectId ?? this.selected?.project) &&
+						ticket.id === this.selected?.id,
 				);
 			}
+			this.selectLinkedTicket();
 		} catch (error) {
+			if (sequence !== this.refreshSequence || !this.isConnected) return;
+			this.selected = undefined;
 			this.loadError = error instanceof Error ? error.message : 'Failed to load tickets';
+		} finally {
+			if (sequence === this.refreshSequence && this.isConnected) this.refreshing = false;
 		}
+	}
+
+	private selectLinkedTicket(): void {
+		if (!this.ticketId || this.linkedClosed || !this.hasRead) return;
+		this.selected = linkedTicket(this.tickets, this.project, this.ticketId);
+		this.linkError = this.selected ? '' : 'The linked ticket is not available in this project.';
 	}
 
 	private showToast(message: string): void {
@@ -428,9 +459,12 @@ export class AyTicketList extends LitElement {
 				@ay-changed=${() => this.refresh()}
 				@ay-notify=${(event: CustomEvent<{ message: string }>) => this.showToast(event.detail.message)}
 				@ay-open=${(event: CustomEvent<TicketWithProject>) => {
+					this.linkedClosed = true;
+					this.linkError = '';
 					this.selected = event.detail;
 				}}
 				@ay-close=${() => {
+					this.linkedClosed = true;
 					this.selected = undefined;
 				}}
 				@ay-dock-toggle=${() => this.toggleDock()}
@@ -438,7 +472,13 @@ export class AyTicketList extends LitElement {
 				<div class="panes">
 				<div class="list-section">
 					<div class="toolbar">
-						<span class="count">${this.visibleTickets.length} ticket${this.visibleTickets.length === 1 ? '' : 's'}</span>
+						<span class="count">${
+							this.hasRead
+								? `${this.visibleTickets.length} ticket${this.visibleTickets.length === 1 ? '' : 's'}${this.loadError ? ' · last loaded' : ''}`
+								: this.refreshing
+									? 'Loading tickets…'
+									: ''
+						}</span>
 						<div class="controls">
 							<div class="view-toggle" role="group" aria-label="View">
 								<button class=${this.view === 'list' ? 'active' : ''} @click=${() => this.setView('list')}>
@@ -484,7 +524,17 @@ export class AyTicketList extends LitElement {
 							: null
 					}
 
-					${this.loadError ? html`<div class="empty">${this.loadError}</div>` : null}
+					${
+						this.loadError
+							? html`<div class="empty" aria-busy=${this.refreshing}>
+						<p role="alert">${this.loadError}</p>
+						<button class="btn" ?disabled=${this.refreshing} @click=${() => this.refresh()}>
+							${this.refreshing ? 'Retrying…' : 'Retry tickets'}
+						</button>
+					</div>`
+							: null
+					}
+					${!this.loadError && this.linkError ? html`<div class="empty" role="alert">${this.linkError}</div>` : null}
 					${
 						!this.loadError && this.visibleTickets.length === 0
 							? html`<div class="empty">

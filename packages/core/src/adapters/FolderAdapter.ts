@@ -37,11 +37,16 @@ export class FolderAdapter implements StorageAdapter {
 	}
 
 	protected ticketPath(id: string): string {
-		return join(this.ticketsDir, `${id}.md`);
+		return join(this.dataDir, this.ticketRelativePath(id));
 	}
 
 	/** Path of a ticket file relative to dataDir (used by git operations). */
 	protected ticketRelativePath(id: string): string {
+		// IDs are opaque filename stems (including imported IDs), never paths or
+		// Git pathspecs. Check both platform separators even on a POSIX host.
+		if (!id || id === '.' || id === '..' || /[<>:"/\\|?*\p{Cc}]/u.test(id)) {
+			throw new Error('Invalid ticket ID');
+		}
 		return `${TICKETS_DIR}/${id}.md`;
 	}
 
@@ -49,8 +54,11 @@ export class FolderAdapter implements StorageAdapter {
 		let entries: string[];
 		try {
 			entries = await readdir(this.ticketsDir);
-		} catch {
-			return [];
+		} catch (error) {
+			// An uninitialized folder has no records; unavailable storage is not
+			// an empty successful list and must reach the caller's recovery UI.
+			if (typeof error === 'object' && error !== null && (error as { code?: string }).code === 'ENOENT') return [];
+			throw error;
 		}
 		const tickets: Ticket[] = [];
 		for (const entry of entries) {
@@ -140,8 +148,9 @@ export class FolderAdapter implements StorageAdapter {
 	}
 
 	protected async persist(ticket: Ticket, _message: string, options: PersistOptions = {}): Promise<void> {
+		const path = this.ticketPath(ticket.id);
 		await mkdir(this.ticketsDir, { recursive: true });
-		await writeFile(this.ticketPath(ticket.id), serializeTicket(ticket), {
+		await writeFile(path, serializeTicket(ticket), {
 			encoding: 'utf8',
 			flag: options.exclusive ? 'wx' : 'w',
 		});

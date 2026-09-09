@@ -5,10 +5,14 @@ import { TICKETS_DIR } from '@aylith/tickets-core';
 import type { Hono } from 'hono';
 import { createApp } from './app';
 import { createContext, type ServerContext } from './context';
+import { allowsLocalRequest } from './local-request';
+import { localStartupConfig } from './local-startup';
 import { reconcileProjects } from './reconcile';
 import { projectLocation, readDaemonConfig } from './registry';
 
-const WEB_DIST_DIR = fileURLToPath(new URL('../../../apps/web/dist', import.meta.url));
+// Both src/serve.ts (Bun export) and dist/*.js resolve inside this package.
+// npm consumers do not have the monorepo's apps/web directory.
+const WEB_DIST_DIR = fileURLToPath(new URL('../dist/web', import.meta.url));
 
 const CONTENT_TYPES: Record<string, string> = {
 	'.html': 'text/html; charset=utf-8',
@@ -73,12 +77,22 @@ const watchProjects = (context: ServerContext): (() => void) => {
 	};
 };
 
-export const startDaemon = async (options: { configPath?: string; port?: number; webAssets?: WebAssets } = {}) => {
+export type DaemonOptions = {
+	configPath?: string;
+	port?: number;
+	webAssets?: WebAssets;
+	/** Loopback, exact existing IDs, no reconciliation/config writes or adapter pushes. */
+	local?: boolean;
+	projectIds?: string[];
+};
+
+export const startDaemon = async (options: DaemonOptions = {}) => {
+	if (options.projectIds !== undefined && !options.local) throw new Error('--project-id requires --local');
+	if (options.local && !options.projectIds?.length) throw new Error('--local requires at least one exact --project-id');
 	const initialConfig = await readDaemonConfig(options.configPath);
-	const { config, diagnostics } = await reconcileProjects(initialConfig, {
-		persist: true,
-		configPath: options.configPath,
-	});
+	const { config, diagnostics } = options.local
+		? { config: await localStartupConfig(initialConfig, options.projectIds ?? []), diagnostics: [] }
+		: await reconcileProjects(initialConfig, { persist: true, configPath: options.configPath });
 	for (const diagnostic of diagnostics) {
 		if (diagnostic.kind === 'store-missing')
 			console.warn(`tickets: project "${diagnostic.name}" — ${diagnostic.reason}`);
@@ -89,10 +103,28 @@ export const startDaemon = async (options: { configPath?: string; port?: number;
 	const context = createContext(config);
 	const stopWatching = watchProjects(context);
 	try {
-		const app = createApp(context);
+		const app = createApp(context, { local: options.local });
 		registerStaticUi(app, options.webAssets);
-		const server = Bun.serve({ port: config.port, fetch: app.fetch, idleTimeout: 0 });
-		console.log(`tickets daemon listening on http://localhost:${config.port} (${config.projects.length} project(s))`);
+		const server = Bun.serve({
+			port: config.port,
+			...(options.local ? { hostname: '127.0.0.1' } : {}),
+			fetch(request, listener) {
+				if (options.local && !allowsLocalRequest(request, listener.port)) {
+					return Response.json(
+						{ error: 'This local daemon only accepts requests from its own origin' },
+						{
+							status: 403,
+							headers: { 'cache-control': 'no-store' },
+						},
+					);
+				}
+				return app.fetch(request);
+			},
+			idleTimeout: 0,
+		});
+		console.log(
+			`tickets daemon listening on http://${options.local ? '127.0.0.1' : 'localhost'}:${server.port} (${config.projects.length} project(s))`,
+		);
 		return Object.assign(server, { stopWatching });
 	} catch (error) {
 		stopWatching();

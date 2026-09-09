@@ -4,6 +4,11 @@
 	"version": "0.1.0",
 	"type": "module",
 	"dependencies": {
+		"@aylith/shell-contract": "file:../../../aylith-shell/packages/contracts",
+		"@module-federation/runtime": "2.9.0",
 		"@aylith/tickets-ui": "workspace:*"
+	},
+	"devDependencies": {
+		"@playwright/test": "1.63.0"
 	}
 }

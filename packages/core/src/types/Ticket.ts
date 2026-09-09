@@ -13,4 +13,6 @@ export type Ticket = {
 	attachments: Attachment[];
 	/** Markdown body of the ticket file. */
 	description: string;
+	/** Source-owned incident provenance. Preserve unknown versions through ordinary edits. */
+	incidentProvenance?: unknown;
 };

@@ -41,7 +41,7 @@ const applyPlaceholders = (template: string, values: Record<string, string>): st
 export const composePrompt = (ticket: Ticket, project: PromptProject, options: PromptOptions): string => {
 	const apiBase = options.apiBase.replace(/\/$/, '');
 	const values: Record<string, string> = {
-		$TICKET_API: `${apiBase}/tickets/${project.name}/${ticket.id}`,
+		$TICKET_API: `${apiBase}/tickets/${encodeURIComponent(project.id ?? project.name)}/${encodeURIComponent(ticket.id)}`,
 		$TICKET_ID: ticket.id,
 		$TICKET_TITLE: ticket.title,
 		$TICKET_DESCRIPTION: ticket.description.length > 0 ? ticket.description : '(no description)',
