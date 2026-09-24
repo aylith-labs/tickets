@@ -22,8 +22,9 @@ const required = (key) => {
 	return resolve(option(key));
 };
 const source = fileURLToPath(new URL('../', import.meta.url));
-const root = phase === 'prepare' ? await mkdtemp(join(tmpdir(), 'tickets-package-proof-')) : required('root');
-assert(root.startsWith(`${resolve(tmpdir())}${sep}`), 'Proof data must stay in the temp directory');
+const tempBase = resolve(process.env.TICKETS_PROOF_BASE ?? tmpdir());
+const root = phase === 'prepare' ? await mkdtemp(join(tempBase, 'tickets-package-proof-')) : required('root');
+assert(root.startsWith(`${tempBase}${sep}`), 'Proof data must stay in the selected temp directory');
 const output = phase === 'prepare' ? root : await mkdtemp(join(root, 'browser-'));
 const now = () => new Date().toISOString();
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -65,6 +66,7 @@ function isolatedEnv(profile, git, bun, npm) {
 	for (const key of ['SystemRoot', 'WINDIR', 'ComSpec', 'PATHEXT', 'PROCESSOR_ARCHITECTURE', 'NUMBER_OF_PROCESSORS']) {
 		if (process.env[key]) env[key] = process.env[key];
 	}
+	const windows = process.platform === 'win32';
 	return {
 		...env,
 		PATH: [
@@ -72,18 +74,23 @@ function isolatedEnv(profile, git, bun, npm) {
 			dirname(process.execPath),
 			dirname(git),
 			dirname(npm),
-			join(process.env.SystemRoot, 'System32'),
-		].join(';'),
+			...(windows ? [join(process.env.SystemRoot, 'System32')] : []),
+		].join(windows ? ';' : ':'),
 		HOME: profile,
-		USERPROFILE: profile,
-		HOMEDRIVE: profile.slice(0, 2),
-		HOMEPATH: profile.slice(2),
-		APPDATA: join(profile, 'AppData/Roaming'),
-		LOCALAPPDATA: join(profile, 'AppData/Local'),
+		...(windows
+			? {
+					USERPROFILE: profile,
+					HOMEDRIVE: profile.slice(0, 2),
+					HOMEPATH: profile.slice(2),
+					APPDATA: join(profile, 'AppData/Roaming'),
+					LOCALAPPDATA: join(profile, 'AppData/Local'),
+				}
+			: {}),
 		XDG_CONFIG_HOME: join(profile, '.config'),
 		XDG_CACHE_HOME: join(profile, '.cache'),
 		TEMP: join(profile, 'tmp'),
 		TMP: join(profile, 'tmp'),
+		TMPDIR: join(profile, 'tmp'),
 		GIT_CONFIG_NOSYSTEM: '1',
 		GIT_CONFIG_GLOBAL: join(profile, '.gitconfig'),
 		GIT_TERMINAL_PROMPT: '0',
@@ -149,7 +156,6 @@ async function start(state, port, label, umbrella = false) {
 
 try {
 	if (phase === 'prepare') {
-		assert.equal(process.platform, 'win32', 'This retained proof is Windows-scoped');
 		const bun = required('bun'),
 			npm = required('npm'),
 			git = required('git');
@@ -234,10 +240,13 @@ try {
 		});
 	} else if (phase === 'browser') {
 		const state = JSON.parse(await readFile(join(root, 'state.json'), 'utf8'));
-		const { chromium } = await import(pathToFileURL(join(source, '../dashcam/node_modules/playwright/index.mjs')).href);
-		const { expect } = await import(
+		const { chromium, expect } = await import(
 			pathToFileURL(join(source, 'apps/web/node_modules/@playwright/test/index.mjs')).href
 		);
+		const browserOptions = {
+			headless: true,
+			...(process.env.TICKETS_PROOF_CHROMIUM ? { executablePath: process.env.TICKETS_PROOF_CHROMIUM } : {}),
+		};
 		const port = await freePort();
 		let { job, base } = await start(state, port, 'dist-cli-first');
 		const get = async (path) => {
@@ -252,12 +261,12 @@ try {
 			assert.equal(response.status, 200);
 			assert.equal(hash(Buffer.from(await response.arrayBuffer())), asset.sha256);
 		}
-		browser = await chromium.launch({ headless: true });
+		browser = await chromium.launch(browserOptions);
 		context = await browser.newContext({
 			viewport: { width: 1280, height: 900 },
 			colorScheme: 'light',
 			reducedMotion: 'reduce',
-			recordVideo: { dir: join(output, 'capture') },
+			...(process.env.TICKETS_PROOF_RECORD_VIDEO === '1' ? { recordVideo: { dir: join(output, 'capture') } } : {}),
 		});
 		receipt.browser = browser.version();
 		receipt.pageErrors = [];
@@ -275,6 +284,9 @@ try {
 		page.on('pageerror', (error) => receipt.pageErrors.push(error.message));
 		page.on('request', (request) => receipt.requests.push({ method: request.method(), url: request.url() }));
 		await page.goto(base);
+		await page.waitForFunction(() => customElements.get('ay-ticket-form') !== undefined);
+		if (!(await page.locator('ay-ticket-form').isVisible()))
+			await page.getByRole('button', { name: 'New ticket', exact: true }).click();
 		await expect(page.locator('ay-ticket-form')).toBeVisible();
 		const documentOrigin = await page.evaluate(() => performance.timeOrigin);
 		await page.evaluate(
@@ -319,7 +331,26 @@ try {
 		const created = await response.json();
 		assert.equal(created.projectId, state.project.id);
 		await expect(page.locator('ay-ticket-card').getByText(created.title, { exact: true })).toBeVisible();
-		await page.screenshot({ path: join(output, 'installed-created.png'), fullPage: true });
+		await page.locator('ay-ticket-card').getByText(created.title, { exact: true }).click();
+		const dialog = page.getByRole('dialog');
+		await expect(dialog).toBeVisible();
+		await dialog.getByRole('button', { name: 'Edit', exact: true }).click();
+		const editedTitle = 'Edited from installed npm app';
+		const editedDescription = 'The installed package changed this folder-backed ticket before restart.';
+		await dialog.locator('input[name=title]').fill(editedTitle);
+		await dialog.locator('textarea[name=description]').fill(editedDescription);
+		const saving = page.waitForResponse(
+			(response) => response.request().method() === 'PATCH' && new URL(response.url()).pathname.includes(created.id),
+		);
+		await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+		const savedResponse = await saving;
+		assert.equal(savedResponse.status(), 200);
+		const saved = await savedResponse.json();
+		assert.equal(saved.id, created.id);
+		assert.equal(saved.title, editedTitle);
+		assert.equal(saved.description, editedDescription);
+		await expect(dialog.getByRole('heading', { name: editedTitle, exact: true })).toBeVisible();
+		await page.screenshot({ path: join(output, 'installed-edited.png'), fullPage: true });
 		await context.close();
 		context = undefined;
 		await browser.close();
@@ -330,6 +361,12 @@ try {
 			assert.equal(receipt.formProof.passed, true);
 		}
 		const before = (await get('/api/tickets')).tickets;
+		assert(
+			before.some(
+				(ticket) =>
+					ticket.id === created.id && ticket.title === editedTitle && ticket.description === editedDescription,
+			),
+		);
 		await json(join(output, 'before-restart.json'), before);
 		await stop(job);
 		await assert.rejects(fetch(`${base}/api/projects`, { signal: AbortSignal.timeout(1000) }));
@@ -338,7 +375,7 @@ try {
 		assert.deepEqual(after, before);
 		assert.equal(new Set(after.map((item) => item.id)).size, after.length);
 		await json(join(output, 'after-restart.json'), after);
-		browser = await chromium.launch({ headless: true });
+		browser = await chromium.launch(browserOptions);
 		context = await browser.newContext();
 		await context.route('**/*', (route) =>
 			new URL(route.request().url()).origin === base ? route.continue() : route.abort(),
@@ -346,13 +383,14 @@ try {
 		const restarted = await context.newPage();
 		restarted.setDefaultTimeout(10000);
 		await restarted.goto(`${base}/${state.project.id}?ticket=${created.id}`);
-		await expect(restarted.getByRole('heading', { name: created.title, exact: true })).toBeVisible();
+		await expect(restarted.getByRole('heading', { name: editedTitle, exact: true })).toBeVisible();
 		await restarted.screenshot({ path: join(output, 'restarted-deep-link.png'), fullPage: true });
 		await check('dist CLI and umbrella Bun export serve package UI and retain all records after process restart', {
 			oldPid: receipt.jobs[0].pid,
 			newPid: job.record.pid,
 			tickets: after.length,
 			createdId: created.id,
+			editedTitle,
 		});
 		assert.deepEqual(receipt.pageErrors, []);
 		assert.deepEqual(receipt.blocked, []);

@@ -71,9 +71,32 @@ checkout includes later features; they are not automatically in release0.1.3.
 Current local0.1.4 builds include `dist/web` inside the server package and check
 those assets before packing. A fresh Windows npm consumer has verified browser
 creation, narrow/keyboard recovery, external file updates and records surviving
-a daemon restart. These repairs have **not** been published. Build with
+a daemon restart. On 24 September 2026, a fresh isolated **Linux** npm consumer
+of all five locally packed0.1.4 archives also verified the installed browser UI:
+folder-backed creation, title/description editing, API retrieval, a daemon
+restart using the umbrella Bun export, and the same edited ticket opening by
+deep link. The source was `55496af6`; retained local prepare/browser receipts are
+under `/home/stevenp/tickets-proof.vYtzfb/tickets-package-proof-VS8Dav/`.
+The installed server and umbrella archive SHA-256 hashes were
+`29d30907898f698fd546e909916cdf0e2766d970a2b22a125858b10c1a5f0a37`
+and `58c33a776e75ec3d99ada16e9a3c3eab511fa7f818326d5cf760efee152439d1`.
+The Linux proof uses a fresh task-owned profile/store and system Chromium; it is
+not a published-registry installation, Steve's existing store, real-user
+onboarding, the TUI, Git storage, remote access or a security assessment. The
+daemon remains auth-less and should stay local. These repairs have **not** been published. Build with
 `bun run build` before packing; `bun run build:web` also refreshes both the
 checkout and packaged browser assets without a Unix `cp` dependency.
+The same Linux checkout passed all 385 tests (2,789 assertions) with a task-owned
+`TMPDIR` and `bun run typecheck`; the default `/tmp` on this host produced `EDQUOT`
+and is not a product-test failure.
+
+The repeatable local archive proof is `scripts/package-first-use-proof.mjs`:
+`prepare --bun <absolute-bun> --npm <absolute-npm> --git <absolute-git>`, then
+`browser --root <root printed by prepare>`. Set `TICKETS_PROOF_BASE` to a writable
+task-owned directory outside the repo; on Linux, set `TICKETS_PROOF_CHROMIUM`
+to a supported Chromium executable and use a short `TMPDIR` for its Unix socket.
+Video recording is optional (`TICKETS_PROOF_RECORD_VIDEO=1`) and needs the
+Playwright FFmpeg helper. Neither phase publishes or contacts an owner store.
 
 **Standalone binaries** (no runtime needed) — `tickets` (daemon + CLI) and `tickets-tui`:
 
