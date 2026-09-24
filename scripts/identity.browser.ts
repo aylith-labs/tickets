@@ -1,4 +1,4 @@
-import { expect, test } from '../../aylith-shell/node_modules/@playwright/test';
+import { expect, test } from '../apps/web/node_modules/@playwright/test';
 
 test('immutable project route selects the renamed project and creates a persisted ticket', async ({ page }) => {
 	await page.goto('/synthetic-stable-01');
@@ -11,6 +11,23 @@ test('immutable project route selects the renamed project and creates a persiste
 	await expect(page.locator('ay-ticket-card')).toContainText('SYNTHETIC identity proof');
 	await page.reload();
 	await expect(page.locator('ay-ticket-card')).toContainText('SYNTHETIC identity proof');
+});
+
+test('a ticket opened from all projects has a stable link that survives reload', async ({ page }) => {
+	await page.goto('/');
+	await page.getByRole('button', { name: /^(Close|New ticket)$/ }).waitFor();
+	if (await page.getByRole('button', { name: 'New ticket' }).isVisible()) {
+		await page.getByRole('button', { name: 'New ticket' }).click();
+	}
+	await page.getByPlaceholder('What needs fixing or building?').fill('SYNTHETIC linked ticket');
+	await page.getByRole('combobox', { name: 'Project' }).selectOption('synthetic-stable-01');
+	await page.getByRole('button', { name: 'Create ticket', exact: true }).click();
+	await page.locator('ay-ticket-card').filter({ hasText: 'SYNTHETIC linked ticket' }).click();
+	await page.getByRole('link', { name: 'Open ticket link' }).click();
+	await expect(page).toHaveURL(/\/synthetic-stable-01\?ticket=\d+$/);
+	await expect(page.getByRole('dialog', { name: /^Ticket \d+$/ })).toContainText('SYNTHETIC linked ticket');
+	await page.reload();
+	await expect(page.getByRole('dialog', { name: /^Ticket \d+$/ })).toContainText('SYNTHETIC linked ticket');
 });
 
 test('legacy name resolves to canonical ID without losing query or fragment', async ({ page }) => {

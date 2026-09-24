@@ -356,6 +356,13 @@ export class AyTicketDetail extends LitElement {
 
 	private renderBody() {
 		const { ticket } = this;
+		const ticketHref =
+			ticket.projectId && this.meta
+				? new URL(
+						`/${encodeURIComponent(ticket.projectId)}?ticket=${encodeURIComponent(ticket.id)}`,
+						new URL(this.meta.apiBase, location.href),
+					).href
+				: undefined;
 		const before = ticket.attachments.filter((attachment) => attachment.kind === 'before');
 		const after = ticket.attachments.filter((attachment) => attachment.kind === 'after');
 		const other = ticket.attachments.filter((attachment) => attachment.kind === 'other');
@@ -363,6 +370,7 @@ export class AyTicketDetail extends LitElement {
 		return html`
 					<header>
 						<span class="mono">${ticket.project} / #${ticket.id}</span>
+						${ticketHref ? html`<a class="btn" href=${ticketHref}>Open ticket link</a>` : null}
 						<select .value=${ticket.status} @change=${this.setStatus} aria-label="Status">
 							${this.meta?.statuses.map(
 								(status) =>

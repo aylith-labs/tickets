@@ -20,6 +20,7 @@ onboarding:
     - Windows x64 release 0.1.3 folder storage passed browser create/edit/reload/restart; Git-backed setup and other platforms remain unverified
     - Released narrow create form overflows at 390px; folder init can initially warn that its storage folder is absent
     - Fresh local 0.1.4 packages repair browser assets and narrow/retryable capture; folder updates and four records survive restart, but these source repairs are not published
+    - Current source offers an explicit stable ticket link from the browser detail view; this is not in the published 0.1.3 binaries
     - Agent launch needs a configured terminal, shell and coding agent; defaults can depend on WSL
     - AI enrichment and media publishing require separate provider or publishing access
     - The daemon is local and has no user authentication; do not expose it to an untrusted network
@@ -80,3 +81,8 @@ worktree — instead of handing off to the terminal and editor you actually use.
 
 Local-first and open source. Your tickets live in your own repos; the daemon runs
 on your machine and drives your tools.
+
+In current source builds, an opened browser ticket has an **Open ticket link**
+action. It uses the project's stable ID and the ticket ID, so the detail opens
+again after a reload. The link points at the local daemon and requires that
+daemon and its store to be available; it is not a hosted sharing service.
