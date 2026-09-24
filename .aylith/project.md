@@ -7,7 +7,6 @@ description: >-
   composed prompt or open a terminal already running your coding agent on it —
   with AI enrichment, git-backed history, and before/after media.
 category: developer-tools
-status: beta
 onboarding:
   access: public-source
   url: https://github.com/aylith-labs/tickets#quick-start
@@ -50,7 +49,7 @@ gradientTo: '#e0a86b'
 
 ## Vision
 
-### Try the beta
+### Set up Tickets locally
 
 Start with the [standalone binary release](https://github.com/aylith-labs/tickets/releases/tag/v0.1.3), then follow the [local quick start](https://github.com/aylith-labs/tickets#quick-start). Linux/macOS have a shell installer; Windows x64 users should choose the `.exe` assets. Review the installer before running it. Source and release versions differ; this catalog does not promise newer source changes in older binaries. Artifact availability has been checked; a clean installation of every platform has not.
 
