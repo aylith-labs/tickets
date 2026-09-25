@@ -1,7 +1,5 @@
 {
-  "permissions": {
-    "allow": [
-      "Bash(node dist/cli.js:*)"
-    ]
-  }
+	"permissions": {
+		"allow": ["Bash(node dist/cli.js:*)"]
+	}
 }
