@@ -5,7 +5,8 @@ description: >-
   A pluggable personal issue tracker that turns "I should fix that" moments into
   agent work. File a ticket in the browser or a terminal TUI, then copy a
   composed prompt or open a terminal already running your coding agent on it —
-  with AI enrichment, git-backed history, and before/after media.
+  with optional AI enrichment, Git-backed history for Git stores, and
+  before/after media through a configured publisher.
 category: developer-tools
 onboarding:
   access: public-source
@@ -25,13 +26,13 @@ onboarding:
     - AI enrichment and media publishing require separate provider or publishing access
     - The daemon is local and has no user authentication; do not expose it to an untrusted network
 features:
-  - 'File tickets in a browser, a terminal TUI, or embedded in any app'
+  - 'File tickets in a browser, a terminal TUI, or embedded in a web app'
   - 'Hand a ticket to a configured local terminal and coding agent'
-  - 'Optional AI enrichment through a configured CLI or provider, with git-backed undo'
+  - 'Optional AI enrichment through a configured CLI or provider, with Git-backed undo in Git stores'
   - 'Attach before/after media through your configured media repository and publisher'
   - >-
-    Per-project storage on an orphan git branch — nothing pollutes your main
-    branch
+    Default Git mode keeps per-project tickets on an orphan branch — nothing
+    pollutes your main branch
   - 'Local-first: an auth-less daemon any tool can drive over REST + SSE'
 targetUser: >-
   Developers who juggle many repos and want to capture a fix or feature the
@@ -55,10 +56,9 @@ gradientTo: '#e0a86b'
 Start with the [standalone binary release](https://github.com/aylith-labs/tickets/releases/tag/v0.1.3), then follow the [local quick start](https://github.com/aylith-labs/tickets#quick-start). Linux/macOS have a shell installer; Windows x64 users should choose the `.exe` assets. Review the installer before running it. Source and release versions differ; this catalog does not promise newer source changes in older binaries. Artifact availability has been checked; a clean installation of every platform has not.
 
 The friction between "I should fix that" and actually starting is a terminal you
-haven't opened yet. Tickets removes it: capture the thought in a browser tab or a
-terminal that's already open, then hand it to a coding agent in one action — the
-agent starts in the right repo, on the right task, with a prompt you didn't have
-to write.
+haven't opened yet. Tickets shortens that path: capture the thought in a browser tab
+or a terminal that's already open, then use a configured terminal and coding agent
+to act on a composed prompt in the selected repo.
 
 ## The problem
 
@@ -69,18 +69,19 @@ worktree — instead of handing off to the terminal and editor you actually use.
 
 ## How it's different
 
-- **Real terminal handoff.** A ticket's action opens *your* terminal (Windows
-  Terminal, Tabby, …) running your agent on the ticket — not a headless runner.
-- **History is git.** Every edit is a commit on a per-project orphan branch, so
-  enrich-with-AI has a real undo and your main branch stays clean.
+- **Real terminal handoff.** With a supported local terminal and agent configured,
+  a ticket's action opens that terminal running the agent on the ticket.
+- **Choose a storage mode.** The default per-repo Git store commits edits on an
+  orphan branch, enabling revision-backed undo without touching your main branch.
+  Folder stores use plain files and do not provide Git revision history or undo.
 - **Three surfaces, one daemon.** A browser UI (all projects at once, or one),
   a terminal TUI across every project, and framework-agnostic web components you
-  can embed in any app — all over one local, auth-less REST + SSE API.
+  can embed in a web app — all over one local, auth-less REST + SSE API.
 - **Evidence attachments.** Before/after images and video can use your configured
   media repository and publisher; hosted media access is not supplied by installation.
 
-Local-first and open source. Your tickets live in your own repos; the daemon runs
-on your machine and drives your tools.
+Local-first and open source. Your tickets live in the chosen local Git or folder
+store; the daemon runs on your machine and drives your configured tools.
 
 In current source builds, an opened browser ticket has an **Open ticket link**
 action. It uses the project's stable ID and the ticket ID, so the detail opens
