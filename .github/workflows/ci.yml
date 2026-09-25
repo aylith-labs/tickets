@@ -20,6 +20,9 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      # Listener tests serve the embedded browser assets; a clean checkout has
+      # none until this step runs.
+      - run: bun run build:web
       - run: bun test
       - run: bunx tsc --noEmit
       - run: bunx biome check .

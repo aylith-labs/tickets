@@ -1,12 +1,12 @@
+import type { TicketsMeta } from '@aylith/tickets-core/client';
+import { projectHref, projectKey } from './project-route';
 import {
 	CONTRACT_VERSION,
 	isShellDestination,
 	type ShellHandle,
 	type ShellHostContext,
 	type ShellRemote,
-} from '@aylith/shell-contract';
-import type { TicketsMeta } from '@aylith/tickets-core/client';
-import { projectHref, projectKey } from './project-route';
+} from './shell-compat';
 
 const TRUSTED_MANIFEST = 'http://127.0.0.1:5185/mf-manifest.json';
 let stopPrevious: (() => void) | undefined;
