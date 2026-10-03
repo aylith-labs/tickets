@@ -90,6 +90,11 @@ The same Linux checkout passed all 385 tests (2,789 assertions) with a task-owne
 `TMPDIR` and `bun run typecheck`; the default `/tmp` on this host produced `EDQUOT`
 and is not a product-test failure.
 
+The source release gate now packs all five npm archives, verifies their exact
+dependency versions and browser-asset hashes, then publishes those same checked
+tarballs in dependency order. This gate has not published 0.1.4; public npm 0.1.3
+still lacks the browser assets.
+
 The repeatable local archive proof is `scripts/package-first-use-proof.mjs`:
 `prepare --bun <absolute-bun> --npm <absolute-npm> --git <absolute-git>`, then
 `browser --root <root printed by prepare>`. Set `TICKETS_PROOF_BASE` to a writable
