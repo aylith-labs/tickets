@@ -8,7 +8,7 @@
 		'darwin-x64': 'macOS Intel',
 		'windows-x64': 'Windows x64',
 	};
-	const release = 'https://github.com/aylith-labs/tickets/releases/download/v0.1.3/';
+	const release = 'https://github.com/aylith-labs/tickets/releases/download/v0.1.4/';
 	let epoch = 0;
 	function selectPlatform() {
 		if (!Object.hasOwn(labels, platform.value)) return;

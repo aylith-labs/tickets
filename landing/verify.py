@@ -20,7 +20,7 @@ class StaticArtifact(unittest.TestCase):
         self.assertNotIn('@@PROMPT@@',html)
     def test_release_and_prompt(self):
         html=(ROOT/'index.html').read_text(); js=(ROOT/'site.js').read_text()
-        self.assertIn('releases/download/v0.1.3/',html+js)
+        self.assertIn('releases/download/v0.1.4/',html+js)
         self.assertIn('init --adapter folder',html)
         prompt=(ROOT/'example-prompt.txt').read_text(); self.assertIn('example-17',prompt); self.assertIn('/your/project',prompt)
         self.assertNotIn('/home/stevenp',html+js+prompt)

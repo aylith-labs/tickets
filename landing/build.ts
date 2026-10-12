@@ -42,6 +42,6 @@ console.log(
 		pages: 2,
 		canonical: 'https://tickets.aylith.com/home/',
 		promptSource: 'packages/core/src/prompt.ts',
-		publicRelease: 'v0.1.3',
+		publicRelease: 'v0.1.4',
 	}),
 );

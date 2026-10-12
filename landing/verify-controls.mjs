@@ -64,7 +64,7 @@ for (const p of ['linux-x64', 'linux-arm64', 'darwin-x64', 'darwin-arm64', 'wind
 	nodes.platform.events.change();
 	assert.equal(
 		nodes['download-cli'].href,
-		`https://github.com/aylith-labs/tickets/releases/download/v0.1.3/tickets-${p}${p.startsWith('windows') ? '.exe' : ''}`,
+		`https://github.com/aylith-labs/tickets/releases/download/v0.1.4/tickets-${p}${p.startsWith('windows') ? '.exe' : ''}`,
 	);
 	assert.match(nodes['download-tui'].href, /tickets-tui-/);
 }
