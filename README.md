@@ -34,7 +34,9 @@ bun run publish:all # build + bun publish each package (needs npm auth)
 
 CI (`.github/workflows/`): `ci.yml` runs tests/typecheck/lint/build on every
 push and PR; `publish.yml` publishes the packages to npm on a published
-GitHub release (auth via the `NPM_TOKEN` repo secret).
+GitHub release (auth via the `NPM_TOKEN` repo secret). `landing-pages.yml` builds the static
+homepage in `landing/` (its example prompt comes from the real composer) and
+deploys it to GitHub Pages at <https://tickets.aylith.com/> and `/home/`.
 
 ## How data is stored
 

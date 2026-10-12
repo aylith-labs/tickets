@@ -5,3 +5,4 @@ dist-bin/
 .DS_Store
 daemon.log
 daemon.pid
+landing/build/
