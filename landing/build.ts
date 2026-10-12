@@ -24,7 +24,7 @@ const escapeHtml = (s: string) => s.replaceAll('&', '&amp;').replaceAll('<', '&l
 const html = (await readFile(resolve(root, 'index.html'), 'utf8')).replace('@@PROMPT@@', escapeHtml(prompt));
 await writeFile(resolve(output, 'index.html'), html);
 await writeFile(resolve(output, 'home/index.html'), html);
-for (const file of ['site.css', 'site.js']) await copyFile(resolve(root, file), resolve(output, file));
+for (const file of ['site.css', 'site.js', 'favicon.svg']) await copyFile(resolve(root, file), resolve(output, file));
 await writeFile(resolve(output, 'CNAME'), 'tickets.aylith.com\n');
 await writeFile(
 	resolve(output, 'robots.txt'),

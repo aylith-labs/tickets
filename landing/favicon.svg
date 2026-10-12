@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .t { fill: none; stroke: #ad5a2a; stroke-width: 3; stroke-linejoin: round; }
+    .p { stroke: #ad5a2a; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 2 3; }
+    @media (prefers-color-scheme: dark) { .t, .p { stroke: #e0956a; } }
+  </style>
+  <g transform="rotate(10 16 16)">
+    <rect class="t" x="9" y="4" width="14" height="24" rx="3" />
+    <line class="p" x1="12" y1="19.5" x2="20" y2="19.5" />
+  </g>
+</svg>

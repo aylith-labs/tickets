@@ -28,5 +28,5 @@ class StaticArtifact(unittest.TestCase):
         self.assertEqual((ROOT/'CNAME').read_text(),'tickets.aylith.com\n')
         self.assertTrue((ROOT/'.nojekyll').is_file())
         self.assertIn('prefers-reduced-motion',(ROOT/'site.css').read_text())
-        self.assertEqual({p.name for p in ROOT.iterdir()},{'index.html','home','site.css','site.js','CNAME','robots.txt','sitemap.xml','example-prompt.txt','.nojekyll'})
+        self.assertEqual({p.name for p in ROOT.iterdir()},{'index.html','home','site.css','site.js','CNAME','robots.txt','sitemap.xml','example-prompt.txt','.nojekyll','favicon.svg'})
 if __name__=='__main__': unittest.main()
