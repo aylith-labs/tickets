@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>Tickets</title>
   <style>
     .t { fill: none; stroke: #ad5a2a; stroke-width: 3; stroke-linejoin: round; }
     .p { stroke: #ad5a2a; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 2 3; }
