@@ -8,6 +8,7 @@ description: >-
   with optional AI enrichment, Git-backed history for Git stores, and
   before/after media through a configured publisher.
 category: developer-tools
+websiteUrl: https://tickets.aylith.com/home/
 onboarding:
   access: public-source
   url: https://github.com/aylith-labs/tickets#quick-start
